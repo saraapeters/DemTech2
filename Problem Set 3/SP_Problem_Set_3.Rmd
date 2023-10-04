@@ -1,0 +1,235 @@
+---
+title: "SP_DemTech2_Problem Set 3"
+author: "Sara Peters"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+require(kableExtra)
+library(tinytex)
+library(knitr)
+```
+
+
+
+
+#set up
+```{r}
+
+#Set working directory
+setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/Problem Set 3")
+
+#load libraries
+# install.packages("dplyr")
+# install.packages("tidyverse")
+# install.packages("ggplot2")
+# install.packages("HMDHFDplus")
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library (HMDHFDplus)
+
+#HMD login info:
+#username: speters27@wisc.edu
+#password: @DemTech2
+
+# Set the 'scipen' option to a large value to prevent scientific notation
+options(scipen = 999)
+
+# Set the 'digits' option to control the number of decimal places
+options(digits = 6)  # Change the number to the desired decimal places
+```
+
+#1. Approximately 85,000 adolescents turn 16 each year in Wisconsin. Data from Fohr et al., 2005 suggest that the probability of being involved in a non-fatal motor vehicle accident among Wisconsin 16-year-olds is roughly 0.0486. The authors find that the probability declines dramatically with age, reaching 0.0145 by age 30.
+
+#Assume that, in each year of life, the probability of experiencing a non-fatal motor vehicle accident is equal to 0.062 - 0.000053*(age2), where age is defined in discrete one-year intervals.
+
+#Acquire an account with the Human Mortality Database and the Human Fertility Database. Use the HMDHFDplus package in R to obtain the 2005 single year age-specific death probabilities from the Human Mortality Database. 
+
+
+#Get Data from Human Mortality Database and Construct a standard life table
+
+#Install the R package HMDHFDplus and get the lifetable values directly: https://cran.r-project.org/web/packages/HMDHFDplus/HMDHFDplus.pdf The commands ask you to supply your user name and password, you’ll still need to sign up at HMD first.
+```{r}
+#get 2005 single year age-specific death probabilities from the Human Mortality Database
+US_lt <-readHMDweb(CNTRY = "USA", item = "bltper_1x1", username = "speters27@wisc.edu" , password = "@DemTech2" )
+
+#Filter age-specific death probabilities for only values where year = 2005
+US_qx05 <- US_lt %>% 
+  filter(Year == 2005) %>% 
+  subset (Age  == 16:31)
+
+
+#convert dataframe to all numeric types
+columns_to_process <- c("Age", "lx", "dx", "qx", "Lx")
+
+for (col_name in columns_to_process) {
+  US_qx05 [, col_name] <- as.numeric(US_qx05 [, col_name])
+}
+
+str(US_qx05)
+
+#Construct multiple decrements table
+
+US_qx05_md = US_qx05 %>% 
+  select(Age, lx, dx, qx, Lx) %>%
+  rename( x = Age) %>% 
+  mutate( nqx_accident = 0.062 - 0.000053 * (x^2) ) %>% 
+  mutate (nqx_death = qx) %>% 
+  mutate (nqx_all = nqx_death + nqx_accident) 
+
+
+#set radix at 85,000
+  
+US_qx05_md$lx_all[1] = 85000
+    for(i in 2:nrow(US_qx05_md)) {
+      US_qx05_md$lx_all[i] <- US_qx05_md$lx_all[i-1]*(1-US_qx05_md$nqx_all[i-1])
+    }
+
+#calculate dx for new radix
+#ndx for Car
+for(i in 1:nrow(US_qx05_md)) {
+  US_qx05_md$ndx_accident[i] <- US_qx05_md$lx_all[i]*US_qx05_md$nqx_accident[i]
+}
+
+
+#ndx for death
+for(i in 1:nrow(US_qx05_md)) {
+  US_qx05_md$ndx_death[i] <- US_qx05_md$lx_all[i]*US_qx05_md$nqx_death[i]
+}
+
+##ndx all
+US_qx05_md$ndx_all <- US_qx05_md$lx_all[1] - US_qx05_md$lx_all[2]
+for(i in 1:nrow(US_qx05_md)) {
+  US_qx05_md$ndx_all[i] <- US_qx05_md$lx_all[i]-US_qx05_md$lx_all[i+1]
+}
+
+US_qx05_md$ndx_all[16] = US_qx05_md$lx_all[16]
+
+
+
+
+#create lx columns for death and accidents
+
+# Initialize an empty vector 
+US_qx05_md$lx_accident <- numeric(length(US_qx05_md$lx_all))
+US_qx05_md$lx_death <- numeric(length(US_qx05_md$lx_all))
+
+#create lx accident
+for (i in 1:nrow(US_qx05_md)) {
+  
+  US_qx05_md$lx_accident[i] <- sum(US_qx05_md$ndx_accident[i:16])
+  
+}
+
+#create lx death
+for (i in 1:nrow(US_qx05_md)) {
+  
+  US_qx05_md$lx_death[i] <- sum(US_qx05_md$ndx_death[i:16])
+  
+}
+
+
+#Print life table
+print (US_qx05_md)
+
+
+
+
+ 
+#qxi = given probability
+#dxi= nqxi * lx
+#dxd = dx- dxi
+#qxd = qx * dxd/dx
+#lxi = sumdix above that age
+
+```
+
+
+
+
+##Answer the following questions:
+
+***A.What proportion of Wisconsinites who live to age 16 will live to age 31 without experiencing a motor vehicle accident?***
+
+```{r}
+#npx = lx + n/ lx, lx31//x16
+
+31-16
+
+#15p16 = 
+
+US_qx05_md$lx_all[16]/US_qx05_md$lx_all[1]
+
+#0.595664 or 60%
+
+
+```
+
+
+
+
+***B.Among those who live to age 25 accident-free, what is the probability of experiencing an accident by age 31?***
+sumndx_cause/lx, = sumndx between 25 and 31/l25
+
+```{r}
+
+
+sum(US_qx05_md$ndx_accident[10:15])/US_qx05_md$lx_all[10]
+```
+
+
+
+***C.Among those who survive to age 16, what is the probability of dying without experiencing an accident by age 31?***
+
+sumdx/lx = sumdx between 16 and 31/l16
+
+```{r}
+# sumdx/lx = sumdx between 
+
+sum(US_qx05_md$ndx_death[1:15])/US_qx05_md$lx_all[1]
+
+```
+
+
+
+***D.If the experience of accidents and the probability of dying are process-dependent, is your estimate for C an overestimate or an underestimate of the true probability?***
+
+This life table process assumes that every person in the population has an equal risk of experiencing the event under consideration. But in reality, not everyone has the same amount of risk for experience an event like a non-fatal motor vehicle accident. So the our calculation in C is an overestimate of the probability of dying. 
+
+
+***E.Push your code to GitHub and share the link with someone from class. Answer here the name of the person(s) to whom you shared the link.***
+
+
+
+
+##2. A cohort of never-married individuals are subject to two forces of decrement assumed to be constant within each interval x to x+n. The following age-specific rates were calculated for this cohort:
+# - age-specific mortality rates for never-married individuals:𝑀𝑛𝑥𝐷
+# - age-specific first marriage rages: 𝑀𝑛𝑥𝑀 These are assumed to be zero above the age of 50.
+
+***A.Write an expression in terms of these age-specific transition rates (𝑀𝑛𝑥𝐷 and 𝑀𝑛𝑥𝑀) for the probability of being never married at age 50 for a newborn.*** 
+
+
+
+
+
+***B.Write an expression in terms of these age-specific transition rates for the probability of being never married at age 50 for a newborn, net of mortality.***
+
+
+
+
+
+***C.A second cohort is subject to the same first marriage rates described above but experiences mortality rates that are 20% lower at each age. For this second cohort, write expressions for the probabilities described in (1) and (2). Compare these probabilities with those of the first cohort; which are larger?***
+
+
+
+
+
+***D.You study the population of Sulawesi and observe that the proportion of newborns that are never married at age 50 has stayed constant over time. Yet mortality conditions of individuals have improved at every age during the same period. What can be concluded about trends in first marriage rates in Sulawesi? Why?***
+
+The size of the population at age 50 is increasing as a result of declining mortality rates which means that the denominator for determining the proportion of the population getting married is increasing. If the proporation of newborns that are never married at age 50 has stayed constant, this indicates that the number of people getting married before age 50 is also increasing. 
+

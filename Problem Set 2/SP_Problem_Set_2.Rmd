@@ -1,0 +1,316 @@
+---
+title: "SP_DemTech2_Problem Set 2"
+author: "Sara Peters"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+require(kableExtra)
+library(tinytex)
+library(knitr)
+```
+
+###Lifetable Estimates Using Sullivan’s Method
+
+#In this problem set, you will be calculating gender differences in the expected duration of years lived in poverty for the United States in 2004. You will calculate variance estimates for these expectancies to determine if the estimates of differences between men and women are statistically meaningful, and at what ages.
+
+
+1. Sullivan’s method requires high quality lifetable data to construct total person years in each age group. Set up an account on the Human Mortality Database: https://www.mortality.org/ and get the nLx values for U.S. males and U.S. females in 2004 from the 5x1 abridged tables, e.g. for women: https://www.mortality.org/hmd/USA/STATS/fltper_5x1.txt
+
+
+
+#set up
+```{r}
+
+#Set working directory
+setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/Problem Set 2")
+
+#load libraries
+# install.packages("dplyr")
+# install.packages("tidyverse")
+# install.packages("ggplot2")
+# install.packages("HMDHFDplus")
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library (HMDHFDplus)
+
+#HMD login info:
+#username: speters27@wisc.edu
+#password: @DemTech2
+
+# Set the 'scipen' option to a large value to prevent scientific notation
+options(scipen = 999)
+
+# Set the 'digits' option to control the number of decimal places
+options(digits = 6)  # Change the number to the desired decimal places
+```
+
+#Get Data from Human Mortality Database
+
+Install the R package HMDHFDplus and get the lifetable values directly: https://cran.r-project.org/web/packages/HMDHFDplus/HMDHFDplus.pdf The commands ask you to supply your user name and password, you’ll still need to sign up at HMD first.
+```{r}
+
+getHMDcountries()
+
+#get lifetable data for US females in 2004
+USfemales<-readHMDweb(CNTRY = "USA", item = "fltper_5x1", username = "speters27@wisc.edu" , password = "@DemTech2" )
+
+#get lifetable data for US males in 2004
+USmales<-readHMDweb(CNTRY = "USA", item = "mltper_5x1", username = "speters27@wisc.edu" , password = "@DemTech2" )
+
+#Filter lifetables for only values where year = 2004
+#create vector to identify male vs female life table data
+USfemales04 <- USfemales %>% 
+  filter(Year == 2004) %>% 
+  mutate(sex = "female")
+
+USmales04 <- USmales %>% 
+  filter(Year == 2004) %>% 
+  mutate(sex = "male")
+
+
+#subset life tables to only use Lx, age
+USF_LT_Join <- USfemales04 %>% 
+  select(Age,lx, Lx, ex)
+
+USM_LT_Join <- USmales04 %>% 
+  select(Age,lx, Lx, ex)
+
+```
+
+
+#Upload GSS data
+2. I have used General Social Survey data to estimate the poverty prevalence by age separately for men and women. I have defined the poverty prevalence as the proportion living at or below the poverty line at the time of the survey. You will find these values, as well as the size of the sample used to compute them in a table on the class webpage.
+```{r}
+
+GSS_poverty<- read.csv("ps2data_2023.csv")
+
+#dataset is in long format, convert to two data sets (males and females) to make it easier to wrangle. 
+
+#rename columns
+GSS_poverty <- GSS_poverty %>% 
+  rename(pix = proportion_poverty_1.n_x) %>% 
+  rename(Sx = number_sampled_N) 
+
+Age <- c(0, 1, rep(seq(5, 110, by = 5)))
+
+#separate females from males and add age column for joining with LT data 
+Poverty_females<- GSS_poverty %>% 
+  filter (sex == "female") %>% 
+    mutate (Age = Age)
+
+Poverty_males<- GSS_poverty %>% 
+  filter (sex == "male") %>% 
+  mutate (Age = Age)
+
+#join life table data with GSS poverty data
+
+Poverty_LTF <- left_join (USF_LT_Join, Poverty_females, by =c("Age"))
+Poverty_LTM <- left_join (USM_LT_Join, Poverty_males, by =c("Age"))
+
+#Fix Sx column to be numeric 
+Poverty_LTF = Poverty_LTF %>% 
+  mutate(Sx = str_replace_all(Sx, ",", "")) %>% 
+  mutate(Sx = as.numeric(Sx))
+
+str(Poverty_LTF$Sx)
+
+Poverty_LTM = Poverty_LTM %>% 
+  mutate(Sx = str_replace_all(Sx, ",", "")) %>% 
+  mutate(Sx = as.numeric(Sx))
+
+str(Poverty_LTM$Sx)
+
+```
+
+
+#Create Poverty Free Life Table for US Females and Males in 2004
+```{r}
+
+#Create Life Table for Years lived without poverty for US females in 2004
+
+#Person years lived with poverty at age x
+Poverty_LTF = Poverty_LTF %>% 
+  mutate(PY_P = (pix)*Lx)
+  
+
+# computing Total years lived with poverty from age x
+# Initialize an empty vector to store nqx values
+
+Poverty_LTF$T_pov <- numeric(length(Poverty_LTF$Lx))
+
+#Calculate Tx_poverty
+#Sum 1-pix
+for (i in 1:nrow(Poverty_LTF)) {
+  
+  Poverty_LTF$T_pov[i] <- sum(Poverty_LTF$PY_P[i:24])
+  
+}
+
+#Compute poverty free life expectancy (PLE_F)
+#Txi/lx
+
+Poverty_LTF = Poverty_LTF %>% 
+  mutate(PLE_F = T_pov/lx)
+
+#Compute Proportion of life spent in poverty (%PFLE)
+
+Poverty_LTF = Poverty_LTF %>% 
+  mutate(PLE_prop = PLE_F/ex)
+
+
+#Create Life Table for Years lived without poverty for US males in 2004
+
+#Person years lived without poverty at age x
+Poverty_LTM = Poverty_LTM %>% 
+  mutate(PY_P = (pix*Lx))
+  
+
+# computing Total years lived without disability from age x
+# Initialize an empty vector to store Txi values
+
+Poverty_LTM$T_pov <- numeric(length(Poverty_LTM$Lx))
+
+#Calculate Tx_poverty
+#Sum 1-pix
+for (i in 1:nrow(Poverty_LTM)) {
+  
+  Poverty_LTM$T_pov[i] <- sum(Poverty_LTM$PY_PF[i:24])
+  
+}
+
+#Compute time spent in poverty poverty life expectancy (PFLE_M)
+#Txi/lx
+
+Poverty_LTM = Poverty_LTM %>% 
+  mutate(PLE_M = T_pov/lx)
+
+#Compute Proportion of life spent in poverty 
+
+Poverty_LTM = Poverty_LTM %>% 
+  mutate(PLE_prop = PLE_M/ex)
+
+```
+
+
+#estimate standard errors
+Because the GSS uses simple random sampling, we should be able to estimate standard errors using the simplified formula made available in Molla, Wagener, and Madans (2001), as opposed to correcting for the sampling scheme with a more complicated approach.**.
+
+You may use the approximation given in equation 13 of Molla, Wagener, and Madans (2001).
+A tip: pay careful attention to the notation on the components of each of these equations. For example, equation 11 uses the nLx values, not the nLx prime values.
+
+
+**We must abstract away from reality in a few ways here: (1) the GSS does not include age values above 85. I have filled in the rest of the lifetable assuming that the poverty rates for the 85+ group could be applied to each of the sub-groups in that larger age intervals. I have also greatly increased the number of total respondents above age 85 by giving each subgroup above age 85 the same number of respondents. (2) The GSS does not interview children. I have pulled child poverty data from the National Center for Educational Statistics, assumed that the age-specific rates do not vary between boys and girls and have fabricated the sample sizes of children used to create these rates. Finally: note that I use the GSS here for illustrative purposes. How to measure poverty is nearly its own field and you are at the institution with people leading this field. Use the IRP as a resource if poverty measurement is important to your work: https://www.irp.wisc.edu/resources/how-is-poverty-measured/
+
+#Calculate standard errors
+```{r}
+#For US Females 2004
+#S^2(pix) = (pix*(1-pix)/Sx)
+
+Poverty_LTF <- Poverty_LTF %>%
+  mutate(S2 = (pix * (1-pix) / Sx)) %>% #variance of prevalence rates in age interval x
+  mutate(VAR = (PY_P^2 * S2 )) #variance of life in poverty in age interval x [Li^2* S2] 
+
+# Initialize an empty vector to store var_sum values
+
+Poverty_LTF$var_sum <- numeric(length(Poverty_LTF$Lx))
+
+##Calculate sum of variance of life in poverty 
+#1/lx^2(Sum(var)
+
+for (i in 1:nrow(Poverty_LTF)) {
+  
+  Poverty_LTF$var_sum[i] <- sum(Poverty_LTF$VAR[i:24])
+  
+}
+
+#calculate overall variance  of (var_ex)
+Poverty_LTF = Poverty_LTF %>% 
+  mutate(var_ex_f = (1/lx^2* var_sum))
+
+#calculate standard error of life in poverty at each age interval
+
+Poverty_LTF = Poverty_LTF %>% 
+  mutate(se_p_f = sqrt(var_ex_f))
+
+
+#For US Males 2004
+#S^2(pix) = (pix*(1-pix)/Sx)
+
+Poverty_LTM <- Poverty_LTM %>%
+  mutate(S2 = (pix * (1-pix) / Sx)) %>% #variance of prevalence rates in age interval
+  mutate(VAR = (PY_P^2 * S2 )) #variance of life in poverty in age interval
+
+# Initialize an empty vector to store var_sum values
+
+Poverty_LTM$var_sum <- numeric(length(Poverty_LTM$Lx))
+
+#Calculate sum of variance of life in poverty 
+
+#1/lx^2(Sum(var)
+
+for (i in 1:nrow(Poverty_LTM)) {
+  
+  Poverty_LTM$var_sum[i] <- sum(Poverty_LTM$VAR[i:24])
+  
+}
+
+Poverty_LTM = Poverty_LTM %>% 
+  mutate(var_ex_m = (1/lx^2* var_sum))
+
+#calculate standard error of life in poverty at each age interval
+
+Poverty_LTM = Poverty_LTM %>% 
+  mutate(se_p_m = sqrt(var_ex_m))
+
+print(Poverty_LTF)
+print(Poverty_LTM)
+
+
+```
+
+
+#Perform statistical test for disparity in life lived in poverty at specific ages for females and males
+```{r}
+
+#Select years in poverty and standard error for calculating (females)
+Poverty_LTF_z = Poverty_LTF %>% 
+  select(Age, PLE_F, se_p_f)
+
+#Select years in poverty and standard error for calculating (males)
+Poverty_LTM_z = Poverty_LTM %>% 
+  select(Age, PLE_M, se_p_m)
+
+Poverty_z <- left_join(Poverty_LTF_z, Poverty_LTM_z, by= c("Age"))
+
+Poverty_z = Poverty_z %>% 
+  mutate(diff = PLE_F - PLE_M) %>% 
+  mutate(SE_diff = se_p_f - se_p_m) %>%
+  mutate(z_stat = sqrt(diff/SE_diff)) %>% 
+  mutate(p_value = 2 * pnorm(abs(z_stat), lower.tail = FALSE))
+  
+
+```
+
+#Interpret results
+***(a)Calculate the expected number of years lived in poverty above age x separately for men and women ages 0-100 (using the given intervals).***
+```{r}
+
+print(Poverty_z)
+
+```
+
+
+***(b) Assess whether, at birth, the total expected number of years lived in poverty differs for men and women and whether this difference is statistically significant.***
+
+At birth the total expected number of years lived in poverty for females in the US in 2004 was 16, while for US males it was about 11. These numbers are different and a z-test indicates that they are statistically significant at alpha = 0.05
+
+***(c) Assess these differences at each age interval.***
+According to my results in 2004 in the US females at almost every age (0-100) were expected to live more years while experiencing poverty than males and this difference is statistically significant. The exceptions are between exact ages 105 and 110- I am not sure how to interpret those results or if they are right. 
+
+
