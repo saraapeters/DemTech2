@@ -20,7 +20,7 @@ library(knitr)
 ```{r}
 
 #Set working directory
-setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/Problem Set 3")
+setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/DemTech2/Problem Set 3")
 
 #load libraries
 # install.packages("dplyr")
@@ -173,6 +173,8 @@ US_qx05_md$lx_all[16]/US_qx05_md$lx_all[1]
 
 
 
+
+
 ***B.Among those who live to age 25 accident-free, what is the probability of experiencing an accident by age 31?***
 sumndx_cause/lx, = sumndx between 25 and 31/l25
 
@@ -181,6 +183,9 @@ sumndx_cause/lx, = sumndx between 25 and 31/l25
 
 sum(US_qx05_md$ndx_accident[10:15])/US_qx05_md$lx_all[10]
 ```
+
+
+
 
 
 
@@ -197,6 +202,9 @@ sum(US_qx05_md$ndx_death[1:15])/US_qx05_md$lx_all[1]
 
 
 
+
+
+
 ***D.If the experience of accidents and the probability of dying are process-dependent, is your estimate for C an overestimate or an underestimate of the true probability?***
 
 This life table process assumes that every person in the population has an equal risk of experiencing the event under consideration. But in reality, not everyone has the same amount of risk for experience an event like a non-fatal motor vehicle accident. So the our calculation in C is an overestimate of the probability of dying. 
@@ -204,6 +212,7 @@ This life table process assumes that every person in the population has an equal
 
 ***E.Push your code to GitHub and share the link with someone from class. Answer here the name of the person(s) to whom you shared the link.***
 
+Johanna. https://github.com/saraapeters/DemTech2
 
 
 
