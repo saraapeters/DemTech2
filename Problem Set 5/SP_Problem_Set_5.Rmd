@@ -1,0 +1,350 @@
+---
+title: "Problem Set 5"
+author: "Sara Peters"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+require(kableExtra)
+library(tinytex)
+library(knitr)
+
+#Set working directory
+setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/DemTech2/Problem Set 5")
+
+#load libraries
+# install.packages("dplyr")
+# install.packages("tidyverse")
+# install.packages("ggplot2")
+#install.packages("readxl")
+
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+#library (readxl)
+
+# Set the 'scipen' option to a large value to prevent scientific notation
+options(scipen = 300)
+
+# Set the 'digits' option to control the number of decimal places
+options(digits = 6)  # Change the number to the desired decimal places
+
+```
+
+
+###Soc 756
+
+#Measuring Fertility
+
+***Jenna- I had a hard time this week because I kept encountering different formulas for calculating the same thing, and the different formulas would give me very different results. I didn't get a chance to meet with the study group so in some places I've calculated two things and tried to make a interpretation that makes sense to me. I might try to meet with you next week about this because I find it very confusing.***
+
+
+#1. The  dataframe below describes the U.S. population in 1997. The life table values come from a female life table (remember our small correction to eq. 5.18 in the textbook) with a radix of 100,000.
+
+##Create Dataframe
+```{r}
+
+#Population of Females and their associated births as of July 1, 1997.
+FemLT_97 <- data.frame(
+  x = c(10, 15, 20, 25, 30, 35, 40, 45),
+  n = rep(5, times = 8),
+  Females = c(9315000, 9302000, 8591000, 9446000, 10447000, 11373000, 10800000, 9409000),
+  All_Births = c(10121, 483220, 942048, 1069436, 886798, 409710, 76084, 3333), 
+  Fem_Births = c(4899, 236207, 460534, 523179, 432638, 200533, 37288, 1617), 
+  Lx = c(495678, 494913, 493741, 492428, 490757, 488395, 484977, 479969), 
+  lx = c(99174, 99083, 98868, 98624, 98336, 97945, 97381, 96561)
+)
+
+str(FemLT_97)
+
+print(FemLT_97)
+
+#Male and Female Populations
+Male = 130783000
+Female = 137001000
+l0 = 100000
+
+```
+
+
+#Calculations
+```{r}
+
+#Total births period 0 to T
+
+TB <- sum(FemLT_97$All_Births)
+
+#Person-years lived between 0 and T (total population)
+TP <- sum(Male + Female)
+
+#Person-years lived between 0 and T (Females 15-50)
+#Mortality considered
+LxF <- sum(FemLT_97$Lx)
+#Mortality not considered
+TPF <- sum(FemLT_97$Females)
+
+#Age specific fertility rate
+FemLT_97 = FemLT_97 %>% 
+  mutate(ASFR = FemLT_97$All_Births/FemLT_97$Females * n)
+
+sum_ASFR <- sum(FemLT_97$ASFR)
+
+#TFR for single ages
+FemLT_97 = FemLT_97 %>% 
+  mutate(TFR_1 = (FemLT_97$All_Births/FemLT_97$Females)/5)
+
+sum_TFR <- sum(FemLT_97$TFR_1)
+
+#maternity rate = female births in the period 0 to T to women age x to x + n/Person-years lived in the period 0 to T by women aged x to x + n, maternity function of age m(a)
+
+FemLT_97 = FemLT_97 %>% 
+  mutate(ASMR = FemLT_97$Fem_Births/FemLT_97$Females)
+
+sum_ASMR <- sum(FemLT_97$ASMR)
+
+print(TB)
+print(TP)
+print(LxF)
+print(TPF)
+print(sum_ASFR)
+print(sum_ASMR)
+
+
+
+```
+
+
+***A. What was the Crude Birth Rate in the United States in 1997?***
+```{r}
+
+#Crude birth rate = Births in the period 0 to T/ Person-years lived in the population between time 0 and T
+
+CBR<- ((TB/TP)/5) 
+
+print(CBR)* 1000
+
+```
+
+
+***B. What was the General Fertility Rate in the United States in 1997?***
+```{r}
+
+#General fertility rate = Births in the period 0 to T/ Person-years lived in the period 0 to oT by women aged 15 to 50
+
+FemLT_97 = FemLT_97 %>% 
+  mutate(AS_GFR = ASFR * Females/ TPF)
+
+GFR <- TB/TPF
+
+print(GFR) * 1000
+
+
+#GFR is prefered because the denominator is more specific to the population at risk (women giving birth) and it also takes age structure of the population into consideration. 
+
+Factor_BR <- CBR/GFR
+
+print(Factor_BR)
+
+```
+
+
+***By what factor does the GFR differ from the CBR and why?***
+The difference between crude birth rate and general fertility rate is that the GFR calculation is specific to the population of females who could give birth (population at risk) and takes the age-structure of the population into account). In this case the crude birth rate and general fertility rate differ by a factor of 58 per 1000. 
+
+
+***C. Calculate and graph the age-specific fertility rates in the United States in 1997.***
+
+```{r}
+
+#Age-specific fertility rates = Births in the period 0 to T to women aged x to x + n/ Person-Years lived in the period 0 to T by women aged x to x + n
+
+ASFR_df <- data.frame(ASFR = FemLT_97$ASFR)
+
+print(ASFR_df)
+
+# Plot ASFR
+ggplot(data = FemLT_97, aes(x = x, y = ASFR)) +
+  geom_line(color = "darkblue") +  # Add a dark blue line
+  geom_point() +  # Add points at data values
+  labs(
+    title = "Age-Specific Fertility Rates (ASFR)",
+    x = "Age",
+    y = "Rate",
+    caption = "Source: US Population of Females, 1997"
+  ) +
+  theme_minimal()
+
+```
+
+
+***D. Calculate and interpret the Total Fertility Rate in the United States in 1997.***
+```{r}
+
+#TFR = interval * (Sum of ASFR), ASFR = nFx
+
+TFR = 5 * sum_ASFR
+
+print(TFR)
+
+TFR_1 = sum_TFR * 5
+
+print(TFR_1)
+
+```
+***Interpretation***: The period total fertility rate (TFR) is the average number of children a woman would bear if she experienced a given set of age-specific fertility rates at each age of her reproductive years, assuming survival. This calculation is an example of where I was finding different ways of calculating the rate the first is one you provided and the second is another I've used in the past which distributes the ASFR over 5 years and then adds the interval back to the sum of the ASFRs. Both don't seem right to me.  In this cohort the average number of children per woman could be 10 OR it be less than 1 (.4), which indicates that not every woman is having a child. 
+
+***E. Calculate and interpret the Gross Reproduction Rate (GRR) in the United States in 1997. Assume that the sex ratio of births is invariant to the age of the mother and equal to 1.05.***
+
+```{r}
+
+#GRR = TFR * 1/ 1+ 1.05 (standard measure of sex ratio at birth)
+
+GRR<- sum_ASMR * 5
+
+print (GRR)
+
+```
+***Interpretation***: The gross reproduction rate (GRR) is the number of births an average woman would have assuming survival through reproductive years. It does not account for mortality. In this cohort the GRR indicates 0.988 daughter per childbearing person. 
+
+***F. Calculate and interpret the Net Reproduction Rate (NRR) in the United States in 1997. Make the same assumption as in E.***
+
+```{r}
+#NRR = n* sum(maternity rate * probability of surviving from birth to age group of mother) = n* sum (nFxf * nLx/l0)
+
+FemLT_97 = FemLT_97 %>% 
+  mutate(NRR_a = ASMR * Lx)
+
+sum_FB <- sum(FemLT_97$NRR_a)
+
+NRR<- sum_FB/100000
+
+print(NRR)
+
+
+```
+***Interpretation***: The net reproduction rate is a realistic measure of reproduction because it takes mortality into account by introducing an nLx term. It is the average number of births to females by a birth cohort during their reproductive years, subject to observed age-specific maternity and mortality rates. A NRR of 1 represents replacement level fertility, NRR is generally smaller than GRR because of the consideration of mortality. In this cohort NRR indicates 0.973 daughters per childbearing person.
+
+
+***G. How close is your answer in F to the NRR you would approximate by NRR = p(Am) x GRR? What is the value of this approximation?***
+```{r}
+
+#p(Am) = sum (ASMR * (lx/l0))/ sum of ASMR
+
+FemLT_97 = FemLT_97 %>% 
+  mutate(pAm_a = ASMR * lx/l0)
+
+sum_pAm <- sum(FemLT_97$pAm_a)
+
+pAm <- sum_pAm/ sum_ASMR
+
+print(pAm)
+
+
+
+#NRR = p(Am) * GRR
+
+NRR_pAm <- pAm * GRR
+
+print(NRR_pAm)
+
+```
+***Interpretation***: The approximation of NRR using p(Am) is 0.974 which is close to the calculation for NRR above and still lower than GRR. 
+
+
+```{r}
+print(FemLT_97)
+```
+
+
+#You may assume that l(x) is linear within the intervals (follows the form l(x)=a+bx) to interpolate the value of l(Am) if needed.
+
+
+#2. In hypothetical population Tau, the fecund period is 250 months, the fecundability of all women is 0.2 at all ages during the fecund period, the average anovulatory period after pregnancy is 13 months, the duration of aborted pregnancies is 2 months and the post-abortion anovulatory period is 3 months.
+
+
+#Suppose that eleven possible contraceptive techniques are being considered for a cohort of women. The effectiveness of these techniques range from 0.45 to 0.95 in increments of 0.05.
+
+
+***Using equation 1, graph the expected TFR by contraceptive effectiveness, both in the absence of abortion and in the presence of a 1:1 ratio of abortions to live births. Graph the percent decrease in the TFR implied by the presence of abortion by contraceptive effectiveness.***
+
+
+```{r}
+
+
+#waiting period = (1/p) + 9 for first birth
+#waiting period for subsequent births = (1/p) + 9 + S
+#waiting period for contraception use = (1/p(1-e) + 9 + S) where 1-e is contraception effectiveness (divided by 100 if in percentage form)
+#waiting period for contraceptive use and abortion = (1/p(1-e) + 9 + S + K((1/p(1-e) + S*) where K is the ratio of abortions to live births and S* is the waiting period after fetal death. 
+
+Tau <- data.frame(
+  e = c(seq(0.45, 0.95, by = 0.05))
+)
+
+L <- 250 #length
+p <- 0.2 #fecundability
+S_b <- 13 #sterile period with birth
+Preg <- 9 #pregnancy
+Ab<- 2 #uncompleted pregnancy
+S_a = 3 #sterile period with fetal death (abortion)
+
+#TFR without abortions considered
+Tau = Tau %>% 
+  mutate(TFR_na = L/((1/(p*(1-e)) + S_b + Preg)))
+
+#TFR with abortions considered
+Tau = Tau %>% 
+  mutate(TFR_a = L/((1/(p*(1-e)) + S_b + Preg) + (1*((1/(p*(1-e)) + S_a + Ab)))))
+
+
+
+#% difference of contraceptive effectivness on TFR when abortions are present vs not
+Tau = Tau %>% 
+  mutate(TFR_diff = (TFR_na- TFR_a)/ TFR_na)
+
+
+print(Tau)
+
+#plot TFR by contraceptive effectiveness in the absence of abortion
+ggplot(data = Tau, aes(x = e, y = TFR_na)) +
+  geom_line(color = "pink") +  
+  geom_point() +  # Add points at data values
+  labs(
+    title = "Figure 1. Total fertility rate by contraception effectiveness (no abortions)",
+    x = "Contraception Effectiveness",
+    y = "Total Fertility Rate",
+  ) +
+  theme_minimal()
+
+#plot the TFR by contraceptive effectiveness in the presence of 1:1 ratio of abortions to live births
+ggplot(data = Tau, aes(x = e, y = TFR_a)) +
+  geom_line(color = "purple") +  
+  geom_point() +  # Add points at data values
+  labs(
+    title = "Figure 2. Total fertility rate by contraception effectiveness (abortions)",
+    x = "Contraception Effectiveness",
+    y = "Total Fertility Rate",
+  ) +
+  theme_minimal()
+
+#plot the percept decrease in the TFR implied by the presence of abortion by contraceptive effectiveness
+
+
+ggplot(data = Tau, aes(x = e, y = TFR_diff)) +
+  geom_line(color = "darkgreen") +  
+  geom_point() +  # Add points at data values
+  labs(
+    title = "Figure 3. % Difference in contraceptive effectivness with and without presence of abortions ",
+    x = "Contraception Effectiveness",
+    y = "Percent Difference",
+  ) +
+  theme_minimal()
+
+```
+
+***Interpret both graphs.***
+
+When abortion is not considered the total fertility rate declines from about 8 to about 2 as the effectiveness of contraception increases from .45 to .95 (***Figure 1***). When abortions are considered, the overall total fertility rate decreases because of the increase of incomplete pregnancies (and subsequent increase of sterile periods). When abortions are considered the TFR declines from about 5.5 to about 1 as the effectiveness of contraception increases from .45 to .95 (***Figure 2***). The percentage difference between the two rates shows that as the effectiveness of contraception increases the bigger the difference between the TFR when there are no abortions and the TFR with abortions. This is because with more effective contraception, incomplete pregnancies have a larger impact on the total fertility rate. 

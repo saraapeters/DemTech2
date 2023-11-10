@@ -1,0 +1,464 @@
+---
+title: "SP_DemTech2_Problem Set 4"
+author: "Sara Peters"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+require(kableExtra)
+library(tinytex)
+library(knitr)
+```
+
+###Soc 756
+
+#Problem Set 4
+
+#Increment Decrement Life Tables
+
+
+
+Table 1 (on the class web page) includes the age-specific probabilities of:
+
+***- starting smoking*** (state 1)
+***- quitting smoking*** (state 2)
+***- dying while being a smoker*** (state 3)
+***- dying while being a nonsmoker*** (state 4)
+
+For Italian men born in the 1950’s^a.  Note that “starting smoking” does not necessarily mean starting smoking for the first time. 
+
+Roughly ***1,740,000*** Italian boys born in 1955 survived to age 10. 
+
+Assume that 98% of these boys were nonsmokers at age 10. 
+2% were smokers at age 10
+and all of the smokers at age 10 had been smoking continuously since they began smoking. Use the probabilities in Table 1 to calculate the 
+
+lxi, 
+1dxij
+1Lxij
+
+
+columns of an increment decrement life table for these boys from age 10 to age 50. Note that you do not need matrix algebra or particularly complicated equations to do this. 
+
+
+#set up
+```{r}
+
+#Set working directory
+setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/DemTech2/Problem Set 4")
+
+#load libraries
+# install.packages("dplyr")
+# install.packages("tidyverse")
+# install.packages("ggplot2")
+#install.packages("readxl")
+
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+#library (readxl)
+
+# Set the 'scipen' option to a large value to prevent scientific notation
+options(scipen = 999)
+
+# Set the 'digits' option to control the number of decimal places
+options(digits = 6)  # Change the number to the desired decimal places
+```
+
+
+
+##Load data
+```{r}
+
+#qxi values for italian boy's smoking behavior 
+IT_smoking <- read.csv("ps4_data_2023.csv") 
+
+
+#rename columns to simplify
+IT_data <- IT_smoking %>% 
+  rename(qx_ss = qx_smoke, qx_ns = qx_quit, qx_nsd = qx_NSmortality, qx_sd = qx_Smortality, x = Age)
+
+
+#transform columns to numeric 
+columns_to_process <- c("x", "qx_ss", "qx_ns", "qx_nsd", "qx_sd")
+  
+for (col_name in columns_to_process) {
+  IT_data [, col_name] <- as.numeric(IT_data [, col_name])
+}
+
+str(IT_data)
+
+```
+
+
+##Create increment decrement table of male Italian smokers
+```{r}
+
+#assign radix values for total population and two subpopulations (s and ns). lx is the number of individuals in each state i at exact age x
+
+IT_data$lx[1] <- 100000
+IT_data$lx_ns[1] <- 98000
+IT_data$lx_s[1] <- 2000
+
+#Calculate dx values for lx0, or the number of individuals moving from state i to state j between ages x and x + 1. Four flows total ns = 1, s = 2, nsd = 3, sd = 4. 
+#initializecolumn[populate first row] <- round the result of (first row of lx * first row of qx, no decimals)
+
+#transition from ns(1) to s(2), qx_ss (probabilty of starting smoking)
+IT_data$dx_1_2[1] <- round(IT_data$lx_ns[1]* IT_data$qx_ss[1], digits = 0)
+
+#transition from ns(1) to nsd(3), qx_nsd (probability of dying while nonsmoker)
+IT_data$dx_1_3[1] <- round(IT_data$lx_ns[1]* IT_data$qx_nsd[1], digits = 0)
+
+#transition from s(2) to ns(1), qx_ns (probability of quitting smoking)
+IT_data$dx_2_1[1] <- round(IT_data$lx_s[1]* IT_data$qx_ns[1], digits = 0)
+
+#transition from s(2) to sd(4), qx_sd (probabilty of dying while smoker)
+IT_data$dx_2_4[1] <- round(IT_data$lx_s[1]* IT_data$qx_sd[1], digits = 0)
+
+
+#Use a for loop to calculate the lx and dx values for all other ages
+#notation for lx = lxi + 1 = lxi - dxij - dxv + dxji
+#notation for dx = dxij = lxi * qxji
+
+for(i in 2:nrow(IT_data)){
+  IT_data$lx_ns[i] <- IT_data$lx_ns[i-1]-IT_data$dx_1_2[i-1]-IT_data$dx_1_3[i-1]+IT_data$dx_2_1[i-1]
+  IT_data$lx_s[i] <- IT_data$lx_s[i-1]-IT_data$dx_2_1[i-1]-IT_data$dx_2_4[i-1]+IT_data$dx_1_2[i-1]
+  IT_data$dx_1_2[i] <- round(IT_data$lx_ns[i]*IT_data$qx_ss[i], digits = 0)
+  IT_data$dx_2_1[i] <- round(IT_data$lx_s[i]*IT_data$qx_ns[i], digits = 0)
+  IT_data$dx_2_4[i] <- round(IT_data$lx_s[i]*IT_data$qx_sd[i], digits = 0)
+  IT_data$dx_1_3[i] <- round(IT_data$lx_ns[i]*IT_data$qx_nsd[i], digits = 0)
+  }
+
+#Apply for loop to lx column for total population to check numbers
+
+for(i in 2:nrow(IT_data)) {
+IT_data$lx[i] <- IT_data$lx_ns[i]+IT_data$lx_s[i]
+}
+
+#Calculate LX values, person-years lived in state i between ages x and x + 1, two states lived (smoker and nonsmoker), accounts for exits to death while in either state. 
+#notation Lxi = [lxi + lxi + 1]/2
+
+# Initialize the columns with NA values
+IT_data$Lx_ns <- rep(NA, nrow(IT_data))
+IT_data$Lx_s <- rep(NA, nrow(IT_data))
+IT_data$Lx <- rep(NA, nrow(IT_data))
+
+#run for loop to populate Lx values
+for (i in 1:(nrow(IT_data) - 1)) {
+  IT_data$Lx_ns[i] <- (IT_data$lx_ns[i] + IT_data$lx_ns[i + 1]) / 2
+  IT_data$Lx_s[i] <- (IT_data$lx_s[i] + IT_data$lx_s[i + 1]) / 2
+  IT_data$Lx[i] <- (IT_data$lx[i] + IT_data$lx[i + 1]) / 2
+}
+
+print(IT_data)
+
+
+```
+
+
+
+#Problem Set 4 Questions 
+
+
+#use the table from Schoen 1988 p95 (in powerpoint ) to answer the following questions.
+
+***1. What was the probability that a boy alive at age 10 would have ever smoked by age 50?***
+```{r}
+#Probability a person aged x will ever by in state ij
+#notation Sum dx nonsmoking to smoking + smokers before age 10/l0, sum dx_1_2+ l0(smokers)/l0
+
+Q1 = (sum(IT_data$dx_1_2[1:40]) + IT_data$lx_s[1])/IT_data$lx[1]
+
+print(Q1)
+```
+
+
+***2. How many years above age ten could a boy surviving to age 10***
+```{r}
+
+#Proporation of life spent in state i
+#Schoen notation Ti(0)/T(0)
+#Notation using lx and Lx columns sum of Lx/l0
+
+#a. expect to be a smoker?
+#notation sum of Lx_smokers/l0
+Q2a = sum(IT_data$Lx_s[1:40])/IT_data$lx[1]
+
+
+
+#b. expect to be a non-smoker?
+#Notation sum of Lx_nonsmokers/l0
+Q2b = sum(IT_data$Lx_ns[1:40])/IT_data$lx[1]
+
+
+#c. expect to live?
+#notation sum of LX/l0
+Q2c = sum(IT_data$Lx[1:40])/IT_data$lx[1]
+
+print(Q2a)
+print(Q2b)
+print(Q2c)
+
+```
+
+
+
+***3. Conditioning on persons under age 50 as you are doing, is the average age of smokers or nonsmokers younger?***
+
+Average nonsmokers are younger. 
+
+```{r}
+#mean age of persons in state i, person-years lived in state i between 10-50, 
+#notation Sum(x+.5*n) * Li/ Sum(Li)
+
+#3a- average age of smokers, 
+#notation (sum(x + 0.5) * Lx_s/sumLx_s)
+Q3a = (sum((IT_data$x[1:40] + 0.5)*IT_data$Lx_s[1:40]))/sum(IT_data$Lx_s[1:40])
+
+#3b- average age of nonsmokers, 
+#notation (sum(x + 0.5) * Lx_ns/sumLx_ns)
+Q3b = (sum((IT_data$x[1:40] + 0.5)* IT_data$Lx_ns[1:40]))/sum(IT_data$Lx_ns[1:40])
+
+
+print(Q3a)
+print(Q3b)
+```
+
+
+
+***4. Graph the age-specific probabilities of transitioning into smoking and out of smoking on the same figure. Is the graph consistent with your answer to question 3? Why or why not?***
+
+
+The graph is not consistent with my answers to question 3, the plot indicates that Italian males tend to be smokers at younger ages and nonsmokers at older ages. This might be because the formula used to calculate question 3 considers the ***average years spent*** in a state without paying attention to the age-specific distribution of those ***probabilities*** (what we consider in question 4). The plot below indicates that the age-specific distribution of the probability of starting smoking is squewed towards younger ages but also quite high compared with the probability of not smoking which is much lower until later in life. This indicates that the age structure of the population should be considered. 
+
+```{r}
+#create a plot of age specific probability of smoking and not smoking between ages 10 and 50 for Italian males
+
+
+IT_data %>%
+  ggplot(aes(x = x)) +
+  geom_line(aes(y = qx_ss, color = "Smoking"), linetype = "solid") +
+  geom_line(aes(y = qx_ns, color = "Non-Smoking"), linetype = "dashed") +
+  ylab("Probability of smoking") +
+  xlab("Age") +
+  scale_linetype_manual(name = "Probability of Smoking\nand Not Smoking", values = c("solid", "dashed")) +
+  scale_color_manual(name = "Probability of Smoking\nand Not Smoking", values = c("purple", "orange")) +
+  labs(color = "Line Type") +
+  ggtitle("Probability of Smoking and Not Smoking")
+
+```
+
+
+
+***5. Could you calculate the average duration of quitting spells (periods of time when  those who once smoked were not smoking) using the life table you have created? Why or why not?***
+
+No. To calculate the duration of quitting spells you would need more logitundinal data and would likely need probabilities for a interval of less than one year. There is an equation in Schoen (1988) that it seems like you could use (equation 6) but a) you need the T value for this equation and b) The T value would be an unconditional value, it would include those who have never smoked and those who have smoked and quit. 
+
+
+
+***6. Related: the increment-decrement life table assumes a homogenous application of transition probabilities to all persons in a given state at a given age. Why might this assumption be problematic when studying smoking - particularly when using the three-state system defined here? If you had better data, how might you improve your ability to model the smoking experiences of this cohort? (If helpful, note that the true cumulative conditional probability of ever smoking for Italian males born in 1955 was 0.53, per Federico et al. 2007 AJPH). ***
+
+
+This is problematic when studying smoking because the unconditional probability of smoking doesn't account for a history of smoking in the past which would potentially increase your likelihood of smoking again in the future. A conditional probability for starting smoking for people who have smoked in the past would be a more realistic 
+
+
+
+
+***7. Generate two additional lifetables that condition on smoking status at age 10. Generate a figure that summarizes the expected duration in each state (smoking and non-smoking) by the smoking status of the children at age 10.***
+
+##Expected duration of smoking 10-50 years of age
+```{r}
+#Conditional expectancies (eijx): average # of years spent in state j above age x, for individuals in state i at age x. 
+
+#expected duration of smoking for children aged 10 is the average  # of years spent smoking above age 10 for individuals smoking at age 10. 
+
+#need ex values for probability of exit while smoking.
+
+#create new dataset
+
+IT_smoke <- IT_data %>%
+  select(x, qx_ss, qx_ns, qx_nsd, qx_sd)
+
+# Initialize the variables with appropriate initial values
+IT_smoke$lx_ns <- numeric(nrow(IT_smoke))
+IT_smoke$lx_s <- numeric(nrow(IT_smoke))
+IT_smoke$dx_1_2 <- numeric(nrow(IT_smoke))
+IT_smoke$dx_2_1 <- numeric(nrow(IT_smoke))
+IT_smoke$dx_2_4 <- numeric(nrow(IT_smoke))
+IT_smoke$dx_1_3 <- numeric(nrow(IT_smoke))
+
+#assign radix values for total population and two subpopulations (s and ns). lx is the number of individuals in each state i at exact age x
+
+
+IT_smoke$lx_ns[1] <- 0
+IT_smoke$lx_s[1] <- 2000
+
+#Calculate dx values for lx0, or the number of individuals moving from state i to state j between ages x and x + 1. Four flows total ns = 1, s = 2, nsd = 3, sd = 4. 
+#initializecolumn[populate first row] <- round the result of (first row of lx * first row of qx, 5 decimals)
+
+#transition from ns(1) to s(2), qx_ss (probabilty of starting smoking)
+IT_smoke$dx_1_2[1] <- round(IT_smoke$lx_ns[1]* IT_smoke$qx_ss[1], digits = 5)
+
+#transition from ns(1) to nsd(3), qx_nsd (probability of dying while nonsmoker)
+IT_smoke$dx_1_3[1] <- round(IT_smoke$lx_ns[1]* IT_smoke$qx_nsd[1], digits = 5)
+
+#transition from s(2) to ns(1), qx_ns (probability of quitting smoking)
+IT_smoke$dx_2_1[1] <- round(IT_smoke$lx_s[1]* IT_smoke$qx_ns[1], digits = 5)
+
+#transition from s(2) to sd(4), qx_sd (probabilty of dying while smoker)
+IT_smoke$dx_2_4[1] <- round(IT_smoke$lx_s[1]* IT_smoke$qx_sd[1], digits = 5)
+
+
+#Use a for loop to calculate the lx and dx values for all other ages
+#notation for lx = lxi + 1 = lxi - dxij - dxv + dxji
+#notation for dx = dxij = lxi * qxji
+
+for(i in 2:nrow(IT_smoke)){
+  IT_smoke$lx_ns[i] <- IT_smoke$lx_ns[i-1]-IT_smoke$dx_1_2[i-1]-IT_smoke$dx_1_3[i-1]+IT_smoke$dx_2_1[i-1]
+  IT_smoke$lx_s[i] <- IT_smoke$lx_s[i- 1]-IT_smoke$dx_2_1[i-1]-IT_smoke$dx_2_4[i-1]+IT_smoke$dx_1_2[i-1]
+  IT_smoke$dx_1_2[i] <- round(IT_smoke$lx_ns[i]*IT_smoke$qx_ss[i], digits = 5)
+  IT_smoke$dx_2_1[i] <- round(IT_smoke$lx_s[i]*IT_smoke$qx_ns[i], digits = 5)
+  IT_smoke$dx_2_4[i] <- round(IT_smoke$lx_s[i]*IT_smoke$qx_sd[i], digits = 5)
+  IT_smoke$dx_1_3[i] <- round(IT_smoke$lx_ns[i]*IT_smoke$qx_nsd[i], digits = 5)
+}
+
+
+# Initialize Lx columns with NA values
+IT_smoke$Lx_s <- rep(NA, nrow(IT_smoke))
+
+#run for loop to populate Lx values
+for (i in 1:(nrow(IT_smoke) - 1)) {
+  IT_smoke$Lx_s[i] <- round(((IT_smoke$lx_s[i] + IT_smoke$lx_s[i + 1]) / 2), digits = 5)
+}
+
+# Create Tx column from Lx value
+IT_smoke$Tx[1] <- sum(IT_smoke$Lx_s[1:40])
+for (i in 2:nrow(IT_smoke)) {
+  IT_smoke$Tx[i] <- round(IT_smoke$Tx[i-1] - IT_smoke$Lx_s[i-1], digits = 5)
+}
+
+IT_smoke$ex_s <- round(IT_smoke$Tx / IT_smoke$Lx_s, digits = 5)
+
+plot(IT_smoke$ex)
+
+print(IT_smoke)
+
+print(IT_smoke$ex[1])
+
+
+```
+##Expected duration of nonsmoking 10-50 years of age
+
+```{r}
+#Conditional expectancies (eijx): average # of years spent in state j above age x, for individuals in state i at age x. 
+
+#expected duration of nonsmoking for children aged 10 is the average  # of years spent smoking above age 10 for individuals not smoking at age 10. 
+
+#need ex values for probability of exit while nonsmoking.
+
+#create new dataset
+
+IT_nonsmoke <- IT_data %>%
+  select(x, qx_ss, qx_ns, qx_nsd, qx_sd)
+
+# Initialize the variables with appropriate initial values
+IT_nonsmoke$lx_ns <- numeric(nrow(IT_nonsmoke))
+IT_nonsmoke$lx_s <- numeric(nrow(IT_nonsmoke))
+IT_nonsmoke$dx_1_2 <- numeric(nrow(IT_nonsmoke))
+IT_nonsmoke$dx_2_1 <- numeric(nrow(IT_nonsmoke))
+IT_nonsmoke$dx_2_4 <- numeric(nrow(IT_nonsmoke))
+IT_nonsmoke$dx_1_3 <- numeric(nrow(IT_nonsmoke))
+
+#assign radix values for total population and two subpopulations (s and ns). lx is the number of individuals in each state i at exact age x
+
+
+IT_nonsmoke$lx_ns[1] <- 98000
+IT_nonsmoke$lx_s[1] <- 0
+
+#Calculate dx values for lx0, or the number of individuals moving from state i to state j between ages x and x + 1. Four flows total ns = 1, s = 2, nsd = 3, sd = 4. 
+#initializecolumn[populate first row] <- round the result of (first row of lx * first row of qx, 5 decimals)
+
+#transition from ns(1) to s(2), qx_ss (probabilty of starting smoking)
+IT_nonsmoke$dx_1_2[1] <- round(IT_nonsmoke$lx_ns[1]* IT_nonsmoke$qx_ss[1], digits = 5)
+
+#transition from ns(1) to nsd(3), qx_nsd (probability of dying while nonsmoker)
+IT_nonsmoke$dx_1_3[1] <- round(IT_nonsmoke$lx_ns[1]* IT_nonsmoke$qx_nsd[1], digits = 5)
+
+#transition from s(2) to ns(1), qx_ns (probability of quitting smoking)
+IT_nonsmoke$dx_2_1[1] <- round(IT_nonsmoke$lx_s[1]* IT_nonsmoke$qx_ns[1], digits = 5)
+
+#transition from s(2) to sd(4), qx_sd (probabilty of dying while smoker)
+IT_nonsmoke$dx_2_4[1] <- round(IT_nonsmoke$lx_s[1]* IT_nonsmoke$qx_sd[1], digits = 5)
+
+
+#Use a for loop to calculate the lx and dx values for all other ages
+#notation for lx = lxi + 1 = lxi - dxij - dxv + dxji
+#notation for dx = dxij = lxi * qxji
+
+for(i in 2:nrow(IT_nonsmoke)){
+  IT_nonsmoke$lx_ns[i] <- IT_nonsmoke$lx_ns[i-1]-IT_nonsmoke$dx_1_2[i-1]-IT_nonsmoke$dx_1_3[i-1]+IT_nonsmoke$dx_2_1[i-1]
+  IT_nonsmoke$lx_s[i] <- IT_nonsmoke$lx_s[i-1]-IT_nonsmoke$dx_2_1[i-1]-IT_nonsmoke$dx_2_4[i-1]+IT_nonsmoke$dx_1_2[i-1]
+  IT_nonsmoke$dx_1_2[i] <- round(IT_nonsmoke$lx_ns[i]*IT_nonsmoke$qx_ss[i], digits = 5)
+  IT_nonsmoke$dx_2_1[i] <- round(IT_nonsmoke$lx_s[i]*IT_nonsmoke$qx_ns[i], digits = 5)
+  IT_nonsmoke$dx_2_4[i] <- round(IT_nonsmoke$lx_s[i]*IT_nonsmoke$qx_sd[i], digits = 5)
+  IT_nonsmoke$dx_1_3[i] <- round(IT_nonsmoke$lx_ns[i]*IT_nonsmoke$qx_nsd[i], digits = 5)
+}
+
+
+
+# Initialize Lx columns with NA values
+IT_nonsmoke$Lx_ns <- rep(NA, nrow(IT_smoke))
+
+#run for loop to populate Lx values
+for (i in 1:(nrow(IT_nonsmoke) - 1)) {
+  IT_nonsmoke$Lx_ns[i] <- round(((IT_nonsmoke$lx_ns[i] + IT_nonsmoke$lx_ns[i + 1]) / 2), digits = 5)
+}
+
+
+# Create Tx column from Lx value
+IT_nonsmoke$Tx[1] <- sum(IT_nonsmoke$Lx_ns[1:40])
+for (i in 2:nrow(IT_nonsmoke)) {
+  IT_nonsmoke$Tx[i] <- round(IT_nonsmoke$Tx[i-1] - IT_nonsmoke$Lx_ns[i-1], digits = 5)
+}
+
+IT_nonsmoke$ex_ns <- round(IT_nonsmoke$Tx / IT_nonsmoke$Lx_ns, digits = 5)
+
+plot(IT_nonsmoke$ex_ns)
+
+print(IT_nonsmoke)
+
+print(IT_nonsmoke$ex_ns[1])
+```
+
+
+
+#Generate a figure that summarizes the expected duration in each state (smoking and non-smoking) by the smoking status of the children at age 10.
+```{r}
+# Combine the IT_smoke and IT_nonsmoke dataframes
+
+plot_data <- data.frame(
+  Status = c("Smoking", "Non-Smoking"),
+  Expected_Duration = c(IT_smoke$ex_s[1], IT_nonsmoke$ex_ns[1])
+)
+
+# Create a ggplot2 bar plot with light purple and dark purple colors and no legend
+ggplot(plot_data, aes(x = Status, y = Expected_Duration, fill = Status)) +
+  geom_bar(stat = "identity", width = 0.5, position = position_dodge(width = 0.75)) +
+  geom_text(aes(label = Expected_Duration), vjust = -0.5) +
+  ylab("Expected Duration") +
+  xlab("Status") +
+  scale_fill_manual(values = c("Smoking" = "#A6B1E1", "Non-Smoking" = "#635D8D")) +  # Light and dark purple
+  ggtitle("Expected Duration by Smoking Status") +
+  theme_minimal() +
+  theme(legend.position = "none")  # Remove the legend
+```
+
+
+
+
+
+
