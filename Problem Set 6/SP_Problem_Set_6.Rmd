@@ -56,6 +56,34 @@ options(digits = 6)  # Change the number to the desired decimal places
 
 ##Generate an M matrix with data for Black women and an M matrix with data for White women. You may have to make some decisions in constructing these. Make note of these for the answer to question number 1, to be submitted the following week. Upload your R script that constructs the two matrices to your GitHub page. The only “submission” this week to share the link to your uploaded file to me and two people in the class.
 
+#Assumptions: 
+
+1. Everyone exits the population by age 50
+2. There is no intragenerational educational mobility, ultimate educational attainment is determined at birth
+3. Fertility below age 15 and above age 45 are zero
+4. Fertility, mortality, and mobility are constant
+5. Initial population is distributed into education groups based on % Distribution of educational attainment for black and white women (Table 1). 
+
+
+***1. What decisions did you have to make to work with the data that you received for this assignment? Do these decisions require assumptions?***
+
+I had to make decisions about the mortality and fertility patterns of the population and how to distribute the initial population to run the simmulation. All of these decisions require assumptions. For example, I assume all births happen between ages 15 and 45, and that all members of the population exit by age 50. 
+
+
+***2. What equilibrium distributions of educational attainment for Black and White people are implied by the data in Tables 1-4?***
+
+
+***3. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in fertility patterns between Black and White women?***
+***4. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in maternal mortality patterns between Black and White women?***
+***5. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in child (under 15) mortality patterns by race?***
+***6. To what degree are differences in the education distributions for Black and White people after three generations attributable to differences in intergenerational mobility patterns between Black and White people?***
+***7. What would be the equilibrium education distributions for Black and White people if there were NO intergenerational educational mobility?***
+***8. What would the equilibrium distributions be if mother's and daughter's educational attainments were statistically independent?***
+***9. Extra credit: Choose one of the questions above and plot the population educational distribution over time to determine (a) whether equilibria exist and (b) how long it takes to achieve.***
+
+
+
+
 
 
 
@@ -172,7 +200,7 @@ print(white_matrix_S)
 
 black_matrix_B <- list()
 
-for (i in 3:(length(b_age) - 1)) {
+for (i in 4:(length(b_age) - 1)) {
   new_matrix3 <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
   survival <- c()  # Initialize survival of mothers and calculate
 
@@ -197,7 +225,7 @@ print(black_matrix_B)
 
 
 white_matrix_B <- list()
-for (i in 3:(length(w_age) - 1)) {
+for (i in 4:(length(w_age) - 1)) {
   new_matrix4 <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
   survival <- c()  # Initialize survival of mothers and calculate
 #iterate through each age group at reproductive age (10-45)
@@ -231,14 +259,14 @@ zeromatrix_df<-list()
 zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
 zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
 
-bb_row1<-c(zeromatrix_df,zeromatrix_df,bb_dataframe, zeromatrix_df)
+bb_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bb_dataframe, zeromatrix_df)
 bb_row1_df<-as.data.frame(do.call(cbind, bb_row1))
 
 bb_matrix<-as.matrix(bb_row1_df)
 
 
 #create a dataframe for S elements
-black_lms <- matrix(0, 50, 50)
+black_lms <- matrix(0, 45, 50)
 
 for (i in 1:length(black_matrix_S)) {
   j <- 1:5 + 5*(i-1)
@@ -270,7 +298,7 @@ zeromatrix_df<-list()
 zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
 zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
 
-wb_row1<-c(zeromatrix_df,zeromatrix_df,wb_dataframe, zeromatrix_df)
+wb_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, wb_dataframe, zeromatrix_df)
 wb_row1_df<-as.data.frame(do.call(cbind, wb_row1))
 
 wb_matrix<-as.matrix(wb_row1_df)
@@ -293,6 +321,163 @@ white_lms
 
 white_lm <- rbind(wb_matrix, white_lms)
 
+
+```
+
+#create a starting population matrix based on provided education distribution of population in each age group. With the assumption that educational attainment is assigned at birth, the distribution of the population by education category provided in table 1 is used to distribute the population into education categories within each age group. 
+
+#black population matrix
+
+```{r}
+
+
+# Given vector of values
+black_ed <- c(37.6, 29.0, 23.3, 6.3, 3.8)
+
+# Divide the vector by 100 and multiply by 1000
+black_ed2 <- 1000 * (black_ed / 100)
+
+# Initialize a 5 by 5 matrix
+num_cols <- length(black_ed2)
+num_repeats <- 10
+
+# Repeat the process 10 times and bind the matrices
+black_pop <- do.call(rbind, replicate(num_repeats, {
+  black_pop <- matrix(0, nrow = num_cols, ncol = num_cols)
+  diag(black_pop) <- black_ed2
+  black_pop
+}, simplify = FALSE))
+
+# Print the result
+print(black_pop)
+
+
+
+```
+
+
+#run the simulation for the black population 
+```{r}
+
+# Initialize a data frame to store the results
+num_iterations <- 10000  # Adjust as needed
+blackresult_df <- data.frame(matrix(0, nrow = dim(black_pop)[1], ncol = num_iterations))
+
+# Set convergence threshold
+convergence_threshold <- 1e-15
+
+#transpose the matrix for multiplication
+black_lm2 <- t(black_lm)
+
+#normalize the data
+oldblack_lm2 <- rowSums(black_pop)/sum(black_pop)
+
+#to save distribution for each iteration create a list
+biglistt <- list(oldblack_lm2)
+
+#run the simulation, normalize the data within the interations
+for(i in 1:num_iterations) {
+  newblack_lm <- oldblack_lm2*black_lm2
+  newblack_lm2 <- colSums(newblack_lm)
+  newblack_lm3 <- newblack_lm2/sum(newblack_lm2)
+ 
+#assign the new distribution to the list
+  biglistt <- c(biglistt, list(newblack_lm3))
+  if (all(abs(newblack_lm3 - oldblack_lm2) < convergence_threshold)) {
+      break  # Exit the loop if convergence is met
+  }
+  oldblack_lm2 <- newblack_lm3
+  print(i)
+}
+
+#distribution by education 
+black_edu_dist <- matrix(NA, ncol=0, nrow=5)
+for(i in 1:length(biglistt)) {
+  time <- c(sum(biglistt[[i]][5*c(1:10)-4]), sum(biglistt[[i]][5*c(1:10)-3]), sum(biglistt[[i]][5*c(1:10)-2]), sum(biglistt[[i]][5*c(1:10)-1]), sum(biglistt[[i]][5*c(1:10)]))
+ 
+  black_edu_dist <- cbind(black_edu_dist, time)
+}
+
+
+
+
+
+```
+
+#create white population matrix 
+```{r}
+
+
+# Given vector of values
+white_ed <- c(17.2, 21.9, 42.1, 11.9, 6.9)
+
+# Divide the vector by 100 and multiply by 1000
+white_ed2 <- 1000 * (white_ed / 100)
+
+# Initialize a 5 by 5 matrix
+num_cols <- length(white_ed2)
+num_repeats <- 10
+
+# Repeat the process 10 times and bind the matrices
+white_pop <- do.call(rbind, replicate(num_repeats, {
+  white_pop <- matrix(0, nrow = num_cols, ncol = num_cols)
+  diag(white_pop) <- white_ed2
+  white_pop
+}, simplify = FALSE))
+
+# Print the result
+print(white_pop)
+
+```
+#run the simulation for the white population 
+```{r}
+
+
+# Initialize a data frame to store the results
+num_iterations <- 10000  # Adjust as needed
+whiteresult_df <- data.frame(matrix(0, nrow = dim(white_pop)[1], ncol = num_iterations))
+
+# Set convergence threshold
+convergence_threshold <- 1e-15
+
+#transpose the matrix for multiplication
+white_lm2 <- t(white_lm)
+
+#normalize the data
+oldwhite_lm2 <- rowSums(white_pop)/sum(white_pop)
+
+#to save distribution for each iteration create a list
+biglistt <- list(oldwhite_lm2)
+
+#run the simulation, normalize the data within the interations
+for(i in 1:num_iterations) {
+  newwhite_lm <- oldwhite_lm2*white_lm2
+  newwhite_lm2 <- colSums(newwhite_lm)
+  newwhite_lm3 <- newwhite_lm2/sum(newwhite_lm2)
+ 
+#assign the new distribution to the list
+  biglistt <- c(biglistt, list(newwhite_lm3))
+  if (all(abs(newwhite_lm3 - oldwhite_lm2) < convergence_threshold)) {
+      break  # Exit the loop if convergence is met
+  }
+  oldwhite_lm2 <- newwhite_lm3
+  print(i)
+}
+
+#distribution by education 
+white_edu_dist <- matrix(NA, ncol=0, nrow=5)
+for(i in 1:length(biglistt)) {
+  time <- c(sum(biglistt[[i]][5*c(1:10)-4]), sum(biglistt[[i]][5*c(1:10)-3]), sum(biglistt[[i]][5*c(1:10)-2]), sum(biglistt[[i]][5*c(1:10)-1]), sum(biglistt[[i]][5*c(1:10)]))
+ 
+  white_edu_dist <- cbind(white_edu_dist, time)
+}
+
+
+```
+
+
+#create visualization for black education distribution 
+```{r}
 
 ```
 

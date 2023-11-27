@@ -1,0 +1,2014 @@
+---
+title: "Problem Set 6"
+author: "Sara Peters"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+require(kableExtra)
+library(tinytex)
+library(knitr)
+
+#Set working directory
+setwd("C:/Users/saraa/OneDrive - UW-Madison/SOC 756- Demography Techniques II/Problem Sets/DemTech2/Problem Set 6")
+
+#load libraries
+# install.packages("dplyr")
+# install.packages("tidyverse")
+# install.packages("ggplot2")
+#install.packages("readxl")
+
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+#library (readxl)
+# 
+# # Set the 'scipen' option to a large value to prevent scientific notation
+# options(scipen = 300)
+# 
+# # Set the 'digits' option to control the number of decimal places
+# options(digits = 6)  # Change the number to the desired decimal places
+
+```
+
+
+Soc 756
+
+Multiregional Projection
+
+This exercise requires that you adapt the model of Mare's 1997 "Differential Fertility…" article to the specific constraints and possibilities of the data supplied below. 
+
+You have the data given below in Tables 1-4 for black and white women for a given year. (Percentage totals in these tables may not sum to 100 because of rounding.)
+
+
+For this exercise, assume that (1) the population is closed to immigration and emigration, (2) the population has only one sex (females) and two race categories, (3) all fertility is confined between exact ages 15 and 45 and age-specific fertility rates are constant within this interval, and (4) fertility, mortality, and mobility rates are fixed over time. 
+
+Several of the questions below ask you to describe the equilibrium education distributions. This assumes that there is an equilibrium distribution of persons in the P(t+1) vector across education groups associated with the Leslie matrix and the starting P(0) vector. That is, repeated application of the Leslie matrix to the P(0) vector will eventually produce a P(n) vector in which the distribution of persons across education groups is not changing with each subsequent multiplication.
+
+
+
+This problem set will be submitted in two parts:
+
+
+Generate an M matrix with data for Black women and an M matrix with data for White women. You may have to make some decisions in constructing these. Make note of these for the answer to question number 1, to be submitted the following week. Upload your R script that constructs the two matrices to your GitHub page. The only “submission” this week to share the link to your uploaded file to me and two people in the class.
+
+Assumptions: 
+
+1. Everyone exits the population by age 50
+2. There is no intragenerational educational mobility, ultimate educational attainment is determined at birth
+3. Fertility below age 15 and above age 45 are zero
+4. Fertility, mortality, and mobility are constant
+5. Initial population is distributed into education groups based on % Distribution of educational attainment for black and white women (Table 1). 
+
+
+##Part 1- Generate M Matrix
+
+
+
+
+##Create Dataframes to supply matrices
+```{r}
+
+Lx_fem<- read.csv("nLx_values.csv")
+
+#create separate black and white survival dataframes
+Lx_fem$group <- substr(Lx_fem$cat_race_ed_age,1,3)
+
+Lx_fem$race <- substr(Lx_fem$cat_race_ed_age, 2,2)
+
+Lx_fem$age <- gsub(".*_", "", Lx_fem$cat_race_ed_age)
+
+black_fem <- Lx_fem[which(Lx_fem$race=="b"),]
+
+white_fem <- Lx_fem[which(Lx_fem$race=="w"),]
+
+#create master mobility dataframes from Table 3 in mare
+black_mobility <-data.frame(
+  edu = c(8, 11, 12, 15, 16),
+  black_edu = c(37.6, 29.0, 23.3, 6.3, 3.8), 
+  black_em_8 = c(28.9, 7.9, 2.5, 3.3, 0.0), 
+  black_em_11 = c(26.8, 35.0, 19.0, 3.8, 3.2), 
+  black_em_12 = c(24.3, 27.8, 38.6, 24.3, 16.3), 
+  black_em_15 = c(12.6, 16.4, 21.2, 49.6, 37.1), 
+  black_em_16 = c(7.3, 12.9, 18.8, 18.9, 43.4) 
+ 
+)
+
+white_mobility <-data.frame(
+  edu = c(8, 11, 12, 15, 16),
+  white_edu = c(17.2, 21.9, 42.1, 11.9, 6.9),
+  white_em_8 = c(13.2, 3.4, 1.4, 1.0, 0.1), 
+  white_em_11 = c(17.9, 15.0, 6.1, 2.7, 3.3), 
+  white_em_12 = c(48.5, 42.7, 45.7, 24.3, 14.3), 
+  white_em_15 = c(13.0, 20.8, 24.0, 33.8, 25.9), 
+  white_em_16 = c(7.5, 18.0, 21.7, 38.1, 56.4) 
+)
+
+#subset to exclude distribution of mothers education
+black_em<-black_mobility[1:5, 3:7]
+
+white_em<- white_mobility[1:5, 3:7]
+
+#fertility for the birth matrix
+black_GRR <- c(2.18, 2.18, 1.67, 1.43, 1.01)/ 6
+white_GRR <- c(1.76, 1.81, 1.62, 1.54, 1.27)/ 6
+
+
+
+
+
+
+```
+
+
+#create matrices 
+
+#Black survival matrix
+```{r}
+
+#notation- create a matrix that applies the rate of survival of each age group by educational attainment. This creates a matrix of survival of mothers 
+
+b_edu<- unique(black_fem$group)
+
+b_age<- as.numeric(unique(black_fem$age))
+
+black_matrix_S <- list()
+for(i in 2:length(b_age)) {
+  new_matrix1 <- matrix(0, nrow=5, ncol=5) #inititalize a matrix
+  survival <- c() #calculate surival with for loop
+  for(j in 1:5) {
+    survival <- c(survival, black_fem$nLx[which(black_fem$age==b_age[i] &  black_fem$group==b_edu[j])]/black_fem$nLx[which(black_fem$age==b_age[i]-5 & black_fem$group==b_edu[j])])
+  }
+  diag(new_matrix1) <- survival #apply surival rates to diagonal of matrix
+  black_matrix_S <- c(black_matrix_S, list(new_matrix1)) #apply values to total matrix, creates a matrix for each education group at each age
+  
+}
+
+print(black_matrix_S)
+
+```
+
+#white surivival matrx
+```{r}
+
+w_edu<- unique(white_fem$group) #collect unique education groups
+
+w_age<- as.numeric(unique(white_fem$age)) #collect unique age groups
+
+white_matrix_S <- list()
+for(i in 2:length(w_age)) {
+  new_matrix2 <- matrix(0, nrow=5, ncol=5) #initialize a matrix
+  survival <- c() #calculate survival with for loop
+  for(j in 1:5) {
+    survival <- c(survival, white_fem$nLx[which(white_fem$age==w_age[i] &  white_fem$group==w_edu[j])]/white_fem$nLx[which(white_fem$age==w_age[i]-5 & white_fem$group==w_edu[j])])
+  }
+  diag(new_matrix2) <- survival #apply surival rates to diagonal of matrix
+  white_matrix_S <- c(white_matrix_S, list(new_matrix2)) #apply values to total matrix, creates a matrix for each education group at each age
+  
+}
+
+print(white_matrix_S)
+
+```
+
+#black birth matrix 
+
+```{r}
+
+
+
+black_matrix_B <- list()
+
+for (i in 4:(length(b_age) - 1)) {
+  new_matrix3 <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - black_fem$nLx[which(black_fem$age == b_age[i] & black_fem$group == b_edu[j])] /
+                      black_fem$nLx[which(black_fem$age == b_age[i] - 5 & black_fem$group == b_edu[j])])
+    )
+  }
+
+  new_matrix3 <- (black_em * black_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  black_matrix_B <- c(black_matrix_B, list(new_matrix3))  # Apply values to matrix
+} #and create a list 
+
+print(black_matrix_B)
+```
+
+#white birth matrix 
+
+```{r}
+
+
+white_matrix_B <- list()
+for (i in 4:(length(w_age) - 1)) {
+  new_matrix4 <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+#iterate through each age group at reproductive age (10-45)
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - white_fem$nLx[which(white_fem$age == w_age[i] & white_fem$group == w_edu[j])] /
+                      white_fem$nLx[which(white_fem$age == w_age[i] - 5 & white_fem$group == w_edu[j])])
+    )
+  }
+
+  new_matrix4 <- (white_em * white_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  white_matrix_B <- c(white_matrix_B, list(new_matrix4))  # Apply values to matrix
+} #and create a list 
+
+print(white_matrix_B)
+```
+
+#leslie matrix for black population
+
+```{r}
+
+#create dataframe of b elements
+bb_dataframe <- as.data.frame(do.call(cbind, black_matrix_B))
+bs_dataframe <- as.data.frame(do.call(cbind, black_matrix_S))
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bb_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bb_dataframe, zeromatrix_df)
+bb_row1_df<-as.data.frame(do.call(cbind, bb_row1))
+
+bb_matrix<-as.matrix(bb_row1_df)
+
+
+#create a matrix for S elements
+black_lms <- matrix(0, 45, 50)
+
+for (i in 1:length(black_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  black_lms[j, j] <- black_matrix_S[[i]]
+}
+black_lms
+
+
+# x[1:5, 1:5] <- black_matrix_S[[1]]
+# x[6:10, 6:10] <- black_matrix_S[[2]]
+
+#combine birth matrix and survival matrix: 
+
+black_lm <- rbind(bb_matrix, black_lms)
+
+```
+
+
+#leslie matrix for white population
+
+```{r}
+
+#create dataframe of b elements
+wb_dataframe <- as.data.frame(do.call(cbind, white_matrix_B))
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+wb_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, wb_dataframe, zeromatrix_df)
+wb_row1_df<-as.data.frame(do.call(cbind, wb_row1))
+
+wb_matrix<-as.matrix(wb_row1_df)
+
+
+#create a dataframe for S elements
+white_lms <- matrix(0, 45, 50)
+
+for (i in 1:length(white_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  white_lms[j, j] <- white_matrix_S[[i]]
+}
+white_lms
+
+
+# x[1:5, 1:5] <- black_matrix_S[[1]]
+# x[6:10, 6:10] <- black_matrix_S[[2]]
+
+#combine birth matrix and survival matrix: 
+
+white_lm <- rbind(wb_matrix, white_lms)
+
+
+```
+
+#create a starting population matrix based on provided education distribution of population in each age group. With the assumption that educational attainment is assigned at birth, the distribution of the population by education category provided in table 1 is used to distribute the population into education categories within each age group. 
+
+#black population matrix
+
+```{r}
+
+
+# Given vector of values
+black_ed <- c(37.6, 29.0, 23.3, 6.3, 3.8)
+
+# Divide the vector by 100 and multiply by 1000
+black_ed2 <- 1000 * (black_ed / 100)
+
+# Initialize a 5 by 5 matrix
+num_rows <- length(black_ed2)
+num_repeats <- 10
+
+# Repeat the process 10 times and bind the matrices
+black_pop0 <- do.call(rbind, replicate(num_repeats, {
+  black_pop0 <- matrix(black_ed2, nrow = num_rows, ncol = 1)
+  black_pop0
+}, simplify = FALSE))
+
+# Print the result
+print(black_pop0)
+
+```
+
+
+# run the black population simulation
+```{r}
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_Black_t <- 
+    black_lm %*% 				
+    P_Black_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }		
+  
+      # Store the current iteration in the list
+  black_edu_dis[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tb= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis <- do.call(cbind, black_edu_dis)
+
+```
+
+#black population simulation visualization 
+```{r}
+
+# Convert matrix to dataframe
+black_edu_df <- as.data.frame(black_edu_dis)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df) <- row_names
+
+# Load libraries
+library(ggplot2)
+library(reshape2)
+
+# Add row names as a separate column
+black_edu_df$row <- rownames(black_edu_df)
+
+# Reshape the data for ggplot
+black_edu_df_long <- melt(black_edu_df, id.vars = "row")
+# Extract column numbers
+black_edu_df_long$column <- as.numeric(gsub("V", "", black_edu_df_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist_plot<- ggplot(black_edu_df_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(black_edu_dist_plot)
+
+```
+
+
+
+#white population matrix 
+```{r}
+
+
+# Given vector of values
+white_ed <- c(17.2, 21.9, 42.1, 11.9, 6.9)
+
+# Divide the vector by 100 and multiply by 1000
+white_ed2 <- 1000 * (white_ed / 100)
+
+# Initialize a 5 by 5 matrix
+num_rows <- length(white_ed2)
+num_repeats <- 10
+
+# Repeat the process 10 times and bind the matrices
+white_pop0 <- do.call(rbind, replicate(num_repeats, {
+  white_pop0 <- matrix(white_ed2, nrow = num_rows, ncol = 1)
+  white_pop0
+}, simplify = FALSE))
+
+# Print the result
+print(white_pop0)
+
+
+```
+
+
+
+
+#run the simulation for the white population 
+```{r}
+### Population distribution 
+t <- 0
+n_row <- 5
+P_White_t <- white_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+# Initialize a list to store results
+white_edu_dis <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_White_t <- 
+    white_lm %*% 				
+    P_White_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_White_t[seq(i,50,5),1])/sum(P_White_t)
+  }		
+  
+  
+    # Store the current iteration in the list
+  white_edu_dis[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tw= t
+
+# Convert edu_dis_list to a matrix
+white_edu_dis <- do.call(cbind, white_edu_dis)
+
+
+
+```
+
+
+#white pop visualization simulation
+```{r}
+
+# Convert matrix to dataframe
+white_edu_df <- as.data.frame(white_edu_dis)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(white_edu_df) <- row_names
+
+# Load libraries
+library(ggplot2)
+library(reshape2)
+
+# Add row names as a separate column
+white_edu_df$row <- rownames(white_edu_df)
+
+white_edu_df_long <- melt(white_edu_df, id.vars = "row")
+# Extract column numbers
+white_edu_df_long$column <- as.numeric(gsub("V", "", white_edu_df_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+white_edu_dist_plot<- ggplot(white_edu_df_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("White Education Distribution Over Time") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tw), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(white_edu_dist_plot)
+
+```
+
+##Part 2- Questions and Alternative Simmulations
+
+\newpage
+
+#Question 1
+***1. What decisions did you have to make to work with the data that you received for this assignment? Do these decisions require assumptions?***
+
+I had to make decisions about the mortality and fertility patterns of the population and how to distribute the initial population to run the simmulation. All of these decisions require assumptions. For example, I assume all births happen between ages 15 and 45, and that all members of the population exit by age 50. 
+
+#Question 2
+***2. What equilibrium distributions of educational attainment for Black and White people are implied by the data in Tables 1-4?***
+
+```{r}
+print(white_edu_dist_plot)
+print(black_edu_dist_plot)
+
+
+#Calculate differences between populations 
+
+
+base_diff<- black_edu_df$V291- white_edu_df$V272 
+
+base_diff_df<- data.frame(base_diff)
+
+print(base_diff_df)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V291", "V272", "base_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results_df <- data.frame(
+  black_edu_df[, columns_to_extract[1], drop = FALSE],
+  white_edu_df[, columns_to_extract[2], drop = FALSE],
+  base_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results_df)<- c("Black_Dist", "White_Dist", "Dist_diff")
+
+print(results_df)
+
+```
+
+#Question 3
+
+***3. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in fertility patterns between Black and White women?***
+
+#Assume that Black people have the same fertility as White people
+
+#create alternative black leslie matrix with white population fertility
+```{r setup, include=FALSE}
+
+#create dataframe of b elements
+bwb_dataframe <- as.data.frame(do.call(cbind, white_matrix_B))
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bwb_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bwb_dataframe, zeromatrix_df)
+bwb_row1_df<-as.data.frame(do.call(cbind, bwb_row1))
+
+bwb_matrix<-as.matrix(bwb_row1_df)
+
+
+#create a dataframe for S elements for the black with white fertility matrix
+black_lms3 <- matrix(0, 45, 50)
+
+for (i in 1:length(black_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  black_lms3[j, j] <- black_matrix_S[[i]]
+}
+black_lms3
+
+
+# x[1:5, 1:5] <- black_matrix_S[[1]]
+# x[6:10, 6:10] <- black_matrix_S[[2]]
+
+#combine birth matrix and survival matrix: 
+
+black_lm3 <- rbind(bwb_matrix, black_lms3)
+
+
+
+#run simulation with black with white fertility matrix 
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis3 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_Black_t <- 
+    black_lm3 %*% 				
+    P_Black_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }		
+  
+      # Store the current iteration in the list
+  black_edu_dis3[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tb3= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis3 <- do.call(cbind, black_edu_dis3)
+
+
+##create visualization of alternative simulation 
+# Convert matrix to dataframe
+black_edu_df3 <- as.data.frame(black_edu_dis3)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df3) <- row_names
+
+# Load libraries
+library(ggplot2)
+library(reshape2)
+
+# Add row names as a separate column
+black_edu_df3$row <- rownames(black_edu_df3)
+
+# Reshape the data for ggplot
+black_edu_df3_long <- melt(black_edu_df3, id.vars = "row")
+# Extract column numbers
+black_edu_df3_long$column <- as.numeric(gsub("V", "", black_edu_df3_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist3_plot<- ggplot(black_edu_df3_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time\n based on white fertility") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb3), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(black_edu_dist3_plot)
+
+
+```
+
+
+```{r}
+print(black_edu_dist3_plot)
+```
+
+#Question 4
+
+***4. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in maternal mortality patterns between Black and White women?***
+
+# Assume that Black population have the same mortality pattern as White population
+
+#run alternative simulation with white survivial matrix and black birth matrix
+```{r setup, include=FALSE}
+
+
+#create dataframe of b elements
+bb_dataframe <- as.data.frame(do.call(cbind, black_matrix_B))
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bb_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bb_dataframe, zeromatrix_df)
+bb_row1_df<-as.data.frame(do.call(cbind, bb_row1))
+
+bb_matrix<-as.matrix(bb_row1_df)
+
+
+#create a dataframe for S elements
+black_lms4 <- matrix(0, 45, 50)
+
+for (i in 1:length(white_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  black_lms4[j, j] <- white_matrix_S[[i]]
+}
+print(black_lms4)
+
+
+#combine black birth matrix and white survival matrix: 
+
+black_lm4 <- rbind(bb_matrix, black_lms4)
+
+
+#run simulation with alternative survival matrix
+
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis4<- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_Black_t <- 
+    black_lm4 %*% 				
+    P_Black_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }		
+  
+      # Store the current iteration in the list
+  black_edu_dis4[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tb4= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis4 <- do.call(cbind, black_edu_dis4)
+
+
+#create visualization for alternative simulation 4
+
+# Convert matrix to dataframe
+black_edu_df4 <- as.data.frame(black_edu_dis4)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df4) <- row_names
+
+# Load libraries
+library(ggplot2)
+library(reshape2)
+
+# Add row names as a separate column
+black_edu_df4$row <- rownames(black_edu_df4)
+
+# Reshape the data for ggplot
+black_edu_df4_long <- melt(black_edu_df4, id.vars = "row")
+# Extract column numbers
+black_edu_df4_long$column <- as.numeric(gsub("V", "", black_edu_df4_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist4_plot<- ggplot(black_edu_df4_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time\n based on white mortality") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb4), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(black_edu_dist4_plot)
+
+```
+
+#Question 5
+
+***5. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in child (under 15) mortality patterns by race?***
+
+# Assume that Black population has the same child mortality as White population, child mortality typically means mortality ages 0-5
+
+#update black birth matrix to be based on white survival, apply alternative birth matrix to black leslie matrix
+
+#update black survival matrix so that survival for the first 5 years is based on white survival 
+
+```{r}
+
+
+#update birth survival to apply to black fertility and white birth survival
+black_matrix_B5 <- list()
+
+for (i in 4:(length(b_age) - 1)) {
+  new_matrix5 <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - white_fem$nLx[which(white_fem$age == w_age[i] & white_fem$group == w_edu[j])] /
+                      white_fem$nLx[which(white_fem$age == w_age[i] - 5 & white_fem$group == w_edu[j])])
+    )
+  }
+
+  new_matrix5 <- (black_em * black_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  black_matrix_B5 <- c(black_matrix_B5, list(new_matrix5))  # Apply values to matrix
+} #and create a list 
+
+print(black_matrix_B5)
+
+
+#prepare alternative birth matrix to add to alternative black leslie matrix 
+#create dataframe of b elements
+bbw_dataframe <- as.data.frame(do.call(cbind, black_matrix_B5))
+
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bbw_row1<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bbw_dataframe, zeromatrix_df)
+bbw_row1_df<-as.data.frame(do.call(cbind, bbw_row1))
+
+bbw_matrix<-as.matrix(bbw_row1_df)
+
+#create an alternative survival matrix that applies surivial rates ages 0-5 for white population but keeps survival for black population ages 5+
+
+#update the black surival matrix: 
+
+# Create a new list black_matrix_S5
+black_matrix_S5 <- lapply(1:length(black_matrix_S), function(i) {
+  if (i == 1) {
+    return(white_matrix_S[[1]])
+  } else {
+    return(black_matrix_S[[i]])
+  }
+})
+
+# Print the updated black_matrix_S5
+print(black_matrix_S5)
+
+#transform alternative black survival matrix to be combined with alternative black birth matrix: 
+#create a matrix for S elements
+black_lms5 <- matrix(0, 45, 50)
+
+for (i in 1:length(black_matrix_S5)) {
+  j <- 1:5 + 5*(i-1)
+  black_lms5[j, j] <- black_matrix_S5[[i]]
+}
+print(black_lms5)
+
+
+#combine alternative birth matrix and standard survival matrix: 
+
+black_lm5 <- rbind(bbw_matrix, black_lms5)
+print(black_lm5)
+
+#run simulation with alternative leslie matrix with white childhood mortality and black 
+
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis5 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_Black_t <- 
+    black_lm5 %*% 				
+    P_Black_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }		
+  
+      # Store the current iteration in the list
+  black_edu_dis5[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tb5= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis5 <- do.call(cbind, black_edu_dis5)
+
+#create visualization for alternative black education distribution based on white childhood mortality 0-5
+
+# Convert matrix to dataframe
+black_edu_df5 <- as.data.frame(black_edu_dis5)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df5) <- row_names
+
+# Load libraries
+library(ggplot2)
+library(reshape2)
+
+# Add row names as a separate column
+black_edu_df5$row <- rownames(black_edu_df5)
+
+# Reshape the data for ggplot
+black_edu_df5_long <- melt(black_edu_df5, id.vars = "row")
+# Extract column numbers
+black_edu_df5_long$column <- as.numeric(gsub("V", "", black_edu_df5_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist5_plot<- ggplot(black_edu_df5_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time\n based on white childhood mortality") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb5), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(black_edu_dist5_plot)
+
+```
+
+#Question 6
+
+***6. To what degree are differences in the education distributions for Black and White people after three generations attributable to differences in intergenerational mobility patterns between Black and White people?***
+
+#Assume white mobility pattern for black population 
+
+#update black birth matrix to have white mobility pattern since mobility is assigned at birth
+
+```{r}
+
+black_matrix_B6 <- list()
+
+for (i in 4:(length(b_age) - 1)) {
+  new_matrix6 <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - black_fem$nLx[which(black_fem$age == b_age[i] & black_fem$group == b_edu[j])] /
+                      black_fem$nLx[which(black_fem$age == b_age[i] - 5 & black_fem$group == b_edu[j])])
+    )
+  }
+
+  new_matrix6 <- (white_em * black_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  black_matrix_B6 <- c(black_matrix_B6, list(new_matrix6))  # Apply values to matrix
+} #and create a list 
+
+print(black_matrix_B6)
+
+#transform alternative birth matrix to add to alternative leslie matrix 
+#create dataframe of b elements
+bb_dataframe6 <- as.data.frame(do.call(cbind, black_matrix_B6))
+
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bb_row16<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bb_dataframe6, zeromatrix_df)
+bb_row1_df6<-as.data.frame(do.call(cbind, bb_row1))
+
+bb_matrix6<-as.matrix(bb_row1_df6)
+
+#create alternative leslie matrix based on alternative birth matrix 
+
+#combine birth matrix and survival matrix: 
+
+black_lm6 <- rbind(bb_matrix6, black_lms)
+
+
+#run simulation with alterantive birth matrix 
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis6 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_Black_t <- 
+    black_lm6 %*% 				
+    P_Black_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }		
+  
+      # Store the current iteration in the list
+  black_edu_dis6[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tb6= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis6 <- do.call(cbind, black_edu_dis6)
+
+#Create visualization 
+
+# Convert matrix to dataframe
+black_edu_df6 <- as.data.frame(black_edu_dis6)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df6) <- row_names
+
+# Add row names as a separate column
+black_edu_df6$row <- rownames(black_edu_df6)
+
+# Reshape the data for ggplot
+black_edu_df6_long <- melt(black_edu_df6, id.vars = "row")
+# Extract column numbers
+black_edu_df6_long$column <- as.numeric(gsub("V", "", black_edu_df6_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist6_plot<- ggplot(black_edu_df6_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time\n based on white mobility") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(black_edu_dist6_plot)
+
+```
+
+#Question 7
+
+
+***7. What would be the equilibrium education distributions for Black and White people if there were NO intergenerational educational mobility?***
+
+#Assume no intergerational mobility for black or white populations
+
+#update black birth matrix to not include mobility 
+
+```{r}
+ # Create a 5x5 matrix with 100 in the diagonal
+no_em_matrix<- diag(100, nrow = 5, ncol = 5)
+
+black_matrix_B7 <- list()
+
+for (i in 4:(length(b_age) - 1)) {
+  new_matrix7b <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - black_fem$nLx[which(black_fem$age == b_age[i] & black_fem$group == b_edu[j])] /
+                      black_fem$nLx[which(black_fem$age == b_age[i] - 5 & black_fem$group == b_edu[j])])
+    )
+  }
+
+  new_matrix7b <- (no_em_matrix * black_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  black_matrix_B7 <- c(black_matrix_B7, list(new_matrix7b))  # Apply values to matrix
+} #and create a list 
+
+print(black_matrix_B7)
+
+
+#transform new birth matrix and add it to survival matrix to create leslie matrix 
+#create dataframe of b elements
+bb_dataframe7 <- as.data.frame(do.call(cbind, black_matrix_B7))
+
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bb_row17<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bb_dataframe7, zeromatrix_df)
+bb_row1_df7<-as.data.frame(do.call(cbind, bb_row17))
+
+bb_matrix7<-as.matrix(bb_row1_df7)
+
+
+#create a matrix for S elements
+black_lms <- matrix(0, 45, 50)
+
+for (i in 1:length(black_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  black_lms[j, j] <- black_matrix_S[[i]]
+}
+black_lms
+
+
+#combine birth matrix and survival matrix: 
+
+black_lm7 <- rbind(bb_matrix7, black_lms)
+print(black_lm7)
+
+#run simulation with new matrix 
+
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis7 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+
+  P_Black_t <-
+    black_lm7 %*%
+    P_Black_t
+
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }
+
+      # Store the current iteration in the list
+  black_edu_dis7[[t + 1]] <- edu_dis
+
+  t = t+1
+
+  if(all(edu_dis == edu_dis_prior)){
+    break
+  }
+
+}
+
+
+
+tb7= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis7 <- do.call(cbind, black_edu_dis7)
+
+#create visualization 
+
+# Convert matrix to dataframe
+black_edu_df7 <- as.data.frame(black_edu_dis7)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df7) <- row_names
+
+
+# Add row names as a separate column
+black_edu_df7$row <- rownames(black_edu_df7)
+
+# Reshape the data for ggplot
+black_edu_df7_long <- melt(black_edu_df7, id.vars = "row")
+# Extract column numbers
+black_edu_df7_long$column <- as.numeric(gsub("V", "", black_edu_df7_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist7_plot <- ggplot(black_edu_df7_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Greys") +  # Use a grayscale color palette
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time\n no intergenerational mobility assumed") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb7), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+
+# Print the plot
+print(black_edu_dist7_plot)
+
+```
+
+
+#update white birth matrix to not include mobility 
+
+
+```{r}
+
+#update white birth matrix to drop mobility 
+white_matrix_B7 <- list()
+for (i in 4:(length(w_age) - 1)) {
+  new_matrix7w<- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+#iterate through each age group at reproductive age (10-45)
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - white_fem$nLx[which(white_fem$age == w_age[i] & white_fem$group == w_edu[j])] /
+                      white_fem$nLx[which(white_fem$age == w_age[i] - 5 & white_fem$group == w_edu[j])])
+    )
+  }
+
+  new_matrix7w <- (no_em_matrix * white_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  white_matrix_B7 <- c(white_matrix_B7, list(new_matrix7w))  # Apply values to matrix
+} #and create a list 
+
+print(white_matrix_B7)
+
+#transform white birth matrix to add it to survival matrix and create alternative leslie matrix: 
+
+#create dataframe of b elements
+wb_dataframe7 <- as.data.frame(do.call(cbind, white_matrix_B7))
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+wb_row17<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, wb_dataframe7, zeromatrix_df)
+wb_row17_df<-as.data.frame(do.call(cbind, wb_row17))
+
+wb_matrix7<-as.matrix(wb_row17_df)
+
+#create a dataframe for S elements
+white_lms7 <- matrix(0, 45, 50)
+
+for (i in 1:length(white_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  white_lms7[j, j] <- white_matrix_S[[i]]
+}
+white_lms7
+
+
+#combine birth matrix and survival matrix: 
+
+white_lm7 <- rbind(wb_matrix7, white_lms7)
+
+#run the simulation
+
+### Population distribution 
+t <- 0
+n_row <- 5
+P_White_t <- white_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+# Initialize a list to store results
+white_edu_dis7 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_White_t <- 
+    white_lm7 %*% 				
+    P_White_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_White_t[seq(i,50,5),1])/sum(P_White_t)
+  }		
+  
+  
+    # Store the current iteration in the list
+  white_edu_dis7[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tw7= t
+
+# Convert edu_dis_list to a matrix
+white_edu_dis7 <- do.call(cbind, white_edu_dis7)
+
+#create a visualization
+
+# Convert matrix to dataframe
+white_edu_df7 <- as.data.frame(white_edu_dis7)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(white_edu_df7) <- row_names
+
+
+# Add row names as a separate column
+white_edu_df7$row <- rownames(white_edu_df7)
+
+white_edu_df7_long <- melt(white_edu_df7, id.vars = "row")
+# Extract column numbers
+white_edu_df7_long$column <- as.numeric(gsub("V", "", white_edu_df7_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+white_edu_dist7_plot<- ggplot(white_edu_df7_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("White Education Distribution Over Time\n assuming no educational mobility") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tw7), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(white_edu_dist7_plot)
+
+```
+
+#Question 8
+
+***8. What would the equilibrium distributions be if mother's and daughter's educational attainments were statistically independent?***
+
+#assume statistical indepencene of dauther's educational attainment from mother's educational attainment
+
+#update the educational mobility of black population and apply to birth matrix 
+```{r}
+
+#update the educational mobility matrix: 
+
+# Step 1: Calculate Marginal Probability of Daughter's Education
+marginal_blackd <- rowSums(black_em)
+
+# Step 2: Adjust Conditional Probabilities
+adj_black_em <- black_em
+for (m in 1:5) {
+  adj_black_em[m, ] <- marginal_blackd
+}
+
+# Step 3: Normalize Adjusted Probabilities
+adj_black_em <- adj_black_em / rowSums(adj_black_em)
+
+# Display the adjusted joint probability matrix
+print(adj_black_em)
+
+
+black_matrix_B8 <- list()
+
+for (i in 4:(length(b_age) - 1)) {
+  new_matrix8b <- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - black_fem$nLx[which(black_fem$age == b_age[i] & black_fem$group == b_edu[j])] /
+                      black_fem$nLx[which(black_fem$age == b_age[i] - 5 & black_fem$group == b_edu[j])])
+    )
+  }
+
+  new_matrix8b <- (adj_black_em * black_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  black_matrix_B8 <- c(black_matrix_B8, list(new_matrix8b))  # Apply values to matrix
+} #and create a list 
+
+print(black_matrix_B8)
+
+
+#transform new birth matrix and add it to survival matrix to create leslie matrix 
+#create dataframe of b elements
+bb_dataframe8 <- as.data.frame(do.call(cbind, black_matrix_B8))
+
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+bb_row18<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, bb_dataframe8, zeromatrix_df)
+bb_row1_df8<-as.data.frame(do.call(cbind, bb_row18))
+
+bb_matrix8<-as.matrix(bb_row1_df8)
+
+
+#create a matrix for S elements
+black_lms <- matrix(0, 45, 50)
+
+for (i in 1:length(black_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  black_lms[j, j] <- black_matrix_S[[i]]
+}
+black_lms
+
+
+#combine birth matrix and survival matrix: 
+
+black_lm8 <- rbind(bb_matrix8, black_lms)
+print(black_lm8)
+
+#run simulation with new matrix 
+
+### Population distribution 
+t <- 0
+n_row <- 5
+P_Black_t <- black_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+
+# Initialize a list to store results
+black_edu_dis8 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+
+  P_Black_t <-
+    black_lm7 %*%
+    P_Black_t
+
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_Black_t[seq(i,50,5),1])/sum(P_Black_t)
+  }
+
+      # Store the current iteration in the list
+  black_edu_dis8[[t + 1]] <- edu_dis
+
+  t = t+1
+
+  if(all(edu_dis == edu_dis_prior)){
+    break
+  }
+
+}
+
+
+
+tb8= t
+
+# Convert edu_dis_list to a matrix
+black_edu_dis8 <- do.call(cbind, black_edu_dis8)
+
+#create visualization 
+
+# Convert matrix to dataframe
+black_edu_df8 <- as.data.frame(black_edu_dis8)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(black_edu_df8) <- row_names
+
+
+# Add row names as a separate column
+black_edu_df8$row <- rownames(black_edu_df8)
+
+# Reshape the data for ggplot
+black_edu_df8_long <- melt(black_edu_df8, id.vars = "row")
+# Extract column numbers
+black_edu_df8_long$column <- as.numeric(gsub("V", "", black_edu_df8_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+black_edu_dist8_plot <- ggplot(black_edu_df8_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Greys") +  # Use a grayscale color palette
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("Black Education Distribution Over Time\n no intergenerational mobility assumed") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tb8), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+
+# Print the plot
+print(black_edu_dist8_plot)
+
+```
+
+#update educational mobility of white population to be statistically independent 
+```{r}
+
+#update the educational mobility matrix: 
+
+# Step 1: Calculate Marginal Probability of Daughter's Education
+marginal_whited <- rowSums(white_em)
+
+# Step 2: Adjust Conditional Probabilities
+adj_white_em <- white_em
+for (m in 1:5) {
+  adj_white_em[m, ] <- marginal_whited
+}
+
+# Step 3: Normalize Adjusted Probabilities
+adj_white_em<- adj_white_em / rowSums(adj_white_em)
+
+# Display the adjusted joint probability matrix
+print(adj_white_em)
+
+#update white birth matrix to drop mobility 
+white_matrix_B8 <- list()
+for (i in 4:(length(w_age) - 1)) {
+  new_matrix8w<- matrix(0, nrow = 5, ncol = 5)  # Initialize matrix
+  survival <- c()  # Initialize survival of mothers and calculate
+#iterate through each age group at reproductive age (10-45)
+  for (j in 1:5) {
+    survival <- c(
+      survival,
+      1 - 0.5 * (1 - white_fem$nLx[which(white_fem$age == w_age[i] & white_fem$group == w_edu[j])] /
+                      white_fem$nLx[which(white_fem$age == w_age[i] - 5 & white_fem$group == w_edu[j])])
+    )
+  }
+
+  new_matrix8w <- (adj_white_em * white_GRR) * survival / 100  # Calculate mobility by GRR conditional on survival
+  white_matrix_B8 <- c(white_matrix_B8, list(new_matrix8w))  # Apply values to matrix
+} #and create a list 
+
+print(white_matrix_B8)
+
+#transform white birth matrix to add it to survival matrix and create alternative leslie matrix: 
+
+#create dataframe of b elements
+wb_dataframe8 <- as.data.frame(do.call(cbind, white_matrix_B8))
+
+
+zeromatrix = matrix(0,5,5)
+
+zeromatrix_df<-list()
+zeromatrix_df<-c(zeromatrix_df, list(zeromatrix))
+zeromatrix_df = as.data.frame(do.call(cbind, zeromatrix_df))
+
+wb_row18<-c(zeromatrix_df,zeromatrix_df,zeromatrix_df, wb_dataframe8, zeromatrix_df)
+wb_row18_df<-as.data.frame(do.call(cbind, wb_row18))
+
+wb_matrix8<-as.matrix(wb_row18_df)
+
+#create a dataframe for S elements
+white_lms8 <- matrix(0, 45, 50)
+
+for (i in 1:length(white_matrix_S)) {
+  j <- 1:5 + 5*(i-1)
+  white_lms8[j, j] <- white_matrix_S[[i]]
+}
+white_lms8
+
+
+#combine birth matrix and survival matrix: 
+
+white_lm8 <- rbind(wb_matrix8, white_lms8)
+
+#run the simulation
+
+### Population distribution 
+t <- 0
+n_row <- 5
+P_White_t <- white_pop0
+edu_dis <- matrix(seq(0,0,5), ncol = 1, nrow = 5)
+
+# Initialize a list to store results
+white_edu_dis8 <- list()
+
+while(TRUE) {
+  edu_dis_prior <- edu_dis
+  
+  P_White_t <- 
+    white_lm8 %*% 				
+    P_White_t
+  
+  for (i in 1: n_row){
+    edu_dis[i] <-
+      sum(P_White_t[seq(i,50,5),1])/sum(P_White_t)
+  }		
+  
+  
+    # Store the current iteration in the list
+  white_edu_dis8[[t + 1]] <- edu_dis
+  
+  t = t+1
+  
+  if(all(edu_dis == edu_dis_prior)){
+    print(t)
+    print(edu_dis)
+    break			
+  }	
+  
+}
+
+tw8= t
+
+# Convert edu_dis_list to a matrix
+white_edu_dis8 <- do.call(cbind, white_edu_dis8)
+
+#create a visualization
+
+# Convert matrix to dataframe
+white_edu_df8 <- as.data.frame(white_edu_dis8)
+
+# Define row names
+row_names <- c("0-8 Years", "09-11 Years", "12 Years", "13-15 Years", "16+ Years")
+
+# Assign row names to the data frame
+rownames(white_edu_df8) <- row_names
+
+
+# Add row names as a separate column
+white_edu_df8$row <- rownames(white_edu_df8)
+
+white_edu_df8_long <- melt(white_edu_df8, id.vars = "row")
+# Extract column numbers
+white_edu_df8_long$column <- as.numeric(gsub("V", "", white_edu_df8_long$variable))
+
+
+
+# Plot the distribution with a title and "t" value annotation
+white_edu_dist8_plot<- ggplot(white_edu_df8_long, aes(x = column, y = value, color = factor(row))) +
+  geom_line(stat = "identity", size = 1) +
+  scale_color_brewer(palette = "Set3") +
+  labs(x = "Years", y = "Proportion", color = "Years of Edu") +
+  ggtitle("White Education Distribution Over Time\n assuming no educational mobility") +
+  annotate("text", x = Inf, y = -Inf, label = paste("t =", tw8), hjust = 1, vjust = 0, color = "black", size = 4) +  # Add "t" value annotation
+  theme_minimal()
+
+print(white_edu_dist8_plot)
+
+
+```
+
+#Page Break
+
+#Question 1
+***1. What decisions did you have to make to work with the data that you received for this assignment? Do these decisions require assumptions?***
+
+I had to make decisions about the mortality and fertility patterns of the population and how to distribute the initial population to run the simmulation. All of these decisions require assumptions. For example, I assume all births happen between ages 15 and 45, and that all members of the population exit by age 50. 
+
+#Question 2
+***2. What equilibrium distributions of educational attainment for Black and White people are implied by the data in Tables 1-4?***
+
+```{r setup, include=FALSE}
+
+print(white_edu_dist_plot)
+print(black_edu_dist_plot)
+
+print(results_df)
+
+```
+
+
+#Question 3
+
+***3. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in fertility patterns between Black and White women?***
+
+Assume that Black people have the same fertility as White people
+```{r setup, include=FALSE}
+
+#Calculate differences between populations 
+
+Q3_diff<- base_diff - (black_edu_df3$V229 - white_edu_df$V272)
+
+Q3_diff_df<- data.frame(Q3_diff)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V229", "V272", "Q3_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results3_df <- data.frame(
+  black_edu_df3[, columns_to_extract[1], drop = FALSE],
+  white_edu_df[, columns_to_extract[2], drop = FALSE],
+  Q3_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results3_df)<- c("BwWF_Dist", "White_Dist", "Q3_diff")
+
+print(results3_df)
+
+
+print(black_edu_dist3_plot)
+print(white_edu_dist_plot)
+
+```
+
+
+#Question 4
+
+***4. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in maternal mortality patterns between Black and White women?***
+
+Assume that Black population have the same mortality pattern as White population
+
+```{r setup, include=FALSE}
+
+#Calculate differences between populations 
+
+Q4_diff<- base_diff - (black_edu_df4$V291 - white_edu_df$V272)
+
+Q4_diff_df<- data.frame(Q4_diff)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V291", "V272", "Q4_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results4_df <- data.frame(
+  black_edu_df4[, columns_to_extract[1], drop = FALSE],
+  white_edu_df[, columns_to_extract[2], drop = FALSE],
+  Q4_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results4_df)<- c("BwWM_Dist", "White_Dist", "Q4_diff")
+
+print(results4_df)
+
+
+print(black_edu_dist4_plot)
+print(white_edu_dist_plot)
+
+```
+
+#Question 5
+
+***5. To what degree are differences in the (equilibrium) education distributions for Black and White people attributable to differences in child (under 15) mortality patterns by race?***
+
+Assume that Black population has the same child mortality as White population, child mortality typically means mortality ages 0-5
+
+```{r setup, include=FALSE}
+
+#Calculate differences between populations 
+
+Q5_diff<- base_diff - (black_edu_df5$V284 - white_edu_df$V272)
+
+Q5_diff_df<- data.frame(Q5_diff)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V284", "V272", "Q5_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results5_df <- data.frame(
+  black_edu_df5[, columns_to_extract[1], drop = FALSE],
+  white_edu_df[, columns_to_extract[2], drop = FALSE],
+  Q5_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results5_df)<- c("BwWCM_Dist", "White_Dist", "Q5_diff")
+
+print(results5_df)
+
+
+print(black_edu_dist5_plot)
+print(white_edu_dist_plot)
+
+
+```
+
+#Question 6
+
+***6. To what degree are differences in the education distributions for Black and White people after three generations attributable to differences in intergenerational mobility patterns between Black and White people?***
+
+Assume white mobility pattern for black population 
+```{r setup, include=FALSE}
+
+#Calculate differences between populations 
+
+Q6_diff<- base_diff - (black_edu_df6$V291 - white_edu_df$V272)
+
+Q6_diff_df<- data.frame(Q6_diff)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V291", "V272", "Q6_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results6_df <- data.frame(
+  black_edu_df6[, columns_to_extract[1], drop = FALSE],
+  white_edu_df[, columns_to_extract[2], drop = FALSE],
+  Q6_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results6_df)<- c("BwWMob_Dist", "White_Dist", "Q6_diff")
+
+print(results6_df)
+
+
+print(black_edu_dist6_plot)
+print(white_edu_dist_plot)
+
+
+# Append df2 to df1
+base_Q6_df <- cbind(results_df, results6_df)
+
+# Print the result
+print(base_Q6_df)
+
+
+
+```
+
+
+
+#Question 7
+
+
+***7. What would be the equilibrium education distributions for Black and White people if there were NO intergenerational educational mobility?***
+
+Assume no intergerational mobility for black or white populations
+
+I cannot calculate the difference between these two at equilibrium because there is something wrong with my birth matrix that is throwing of the equilibrium calcuation. However, I chose the same iteration for both simulations (55) to compare.  
+
+```{r setup, include=FALSE}
+
+#Calculate differences between populations 
+
+Q7_diff<- base_diff - (black_edu_df7$V55 - white_edu_df7$V55)
+
+Q7_diff_df<- data.frame(Q7_diff)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V55", "V55", "Q7_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results7_df <- data.frame(
+  black_edu_df7[, columns_to_extract[1], drop = FALSE],
+  white_edu_df7[, columns_to_extract[2], drop = FALSE],
+  Q7_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results7_df)<- c("B_NEM_Dist", "W_NEM_Dist", "Q7_diff")
+
+print(results7_df)
+
+
+print(black_edu_dist7_plot)
+print(white_edu_dist7_plot)
+
+
+
+```
+
+
+#Question 8
+
+***8. What would the equilibrium distributions be if mother's and daughter's educational attainments were statistically independent?***
+
+
+assume statistical indepencene of dauther's educational attainment from mother's educational attainment
+
+I cannot calculate the difference between these two at equilibrium because there is something wrong with my birth matrix that is throwing of the equilibrium calcuation. However, I chose the same iteration for both simulations (55) to compare.
+
+```{r setup, include=FALSE}
+
+
+#Calculate differences between populations 
+
+Q8_diff<- base_diff - (black_edu_df8$V55 - white_edu_df8$V55)
+
+Q8_diff_df<- data.frame(Q8_diff)
+
+
+# Specify the columns you want to extract from each dataframe
+columns_to_extract <- c("V55", "V55", "Q8_diff")
+
+# Create a new dataframe using the specified columns from each dataframe
+results8_df <- data.frame(
+  black_edu_df8[, columns_to_extract[1], drop = FALSE],
+  white_edu_df8[, columns_to_extract[2], drop = FALSE],
+  Q8_diff_df[, columns_to_extract[3], drop = FALSE]
+)
+
+colnames(results8_df)<- c("B_SI_Dist", "W_SI_Dist", "Q7_diff")
+
+print(results8_df)
+
+
+print(black_edu_dist8_plot)
+print(white_edu_dist8_plot)
+
+```
+#Plot of all distributions
+
+I couldn't figure out how to do this. 
+
+```{r setup, include=FALSE}
+
+# 
+# 
+# #Create a dataframe of all the distributions
+# # Specify the columns you want to extract from each dataframe
+# columns_to_extract <- c("Black_Dist", "White_Dist", "BwWF_Dist", "BwWM_Dist", "BwWCM_Dist","BwWMob_Dist", "B_NEM_Dist", "W_NEM_Dist", "B_SI_Dist", "W_SI_Dist")
+# 
+# # Create a new dataframe using the specified columns from each dataframe
+# allresults_df <- data.frame(
+#   results_df[, columns_to_extract[1], drop = FALSE],
+#   results_df[, columns_to_extract[2], drop = FALSE],
+#   results3_df[, columns_to_extract[3], drop = FALSE],
+#   results4_df[, columns_to_extract[4], drop = FALSE],
+#   results5_df[, columns_to_extract[5], drop = FALSE],
+#   results6_df[, columns_to_extract[6], drop = FALSE],
+#   results7_df[, columns_to_extract[7], drop = FALSE],
+#   results7_df[, columns_to_extract[8], drop = FALSE],
+#   results8_df[, columns_to_extract[9], drop = FALSE],
+#   results8_df[, columns_to_extract[10], drop = FALSE]
+# )
+# 
+# colnames(allresults_df)<- columns_to_extract
+# 
+# print(allresults_df)
+# 
+# #install.packages("tibble")
+# library(tibble)
+# 
+# allresults_df <- rownames_to_column(allresults_df, var = "education")
+# 
+# # Create a data frame suitable for ggplot
+# allresults_df_long <- reshape2::melt(allresults_df)
+# 
+# # Plot the values with lines connecting points in the same column
+# ggplot(df_long, aes(x = Education, y = value, group = Var2, color = Var1)) +
+#   geom_line() +
+#   geom_point() +
+#   labs(x = "Column Index", y = "Value", color = "Row Index") +
+#   ggtitle("Connected Scatter Plot of Data Values")
+
+```
+
+
+
+***9. Extra credit: Choose one of the questions above and plot the population educational distribution over time to determine (a) whether equilibria exist and (b) how long it takes to achieve.***
+
+
+
+
